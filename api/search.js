@@ -37,12 +37,17 @@ function getSpecialty(taxonomies) {
   return primary?.desc || 'General Practice';
 }
 
+function toProperCase(str) {
+  if (!str) return '';
+  return str.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+}
+
 function transformDoctor(raw, index) {
   const b = raw.basic || {};
   const addr = raw.addresses?.find(a => a.address_purpose === 'LOCATION') || raw.addresses?.[0] || {};
   const phone = formatPhone(addr.telephone_number);
-  const firstName = b.first_name || '';
-  const lastName = b.last_name || '';
+  const firstName = toProperCase(b.first_name || '');
+  const lastName = toProperCase(b.last_name || '');
   const credential = b.credential || 'MD';
   const name = `Dr. ${firstName} ${lastName}, ${credential}`.trim();
 
@@ -113,7 +118,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid search parameters.', details: data.Errors });
     }
 
-    const results = (data.results || []).map(transformDoctor);
+    const SD_CITIES = ['san diego', 'la jolla', 'chula vista', 'encinitas', 'oceanside', 'el cajon', 'escondido', 'national city', 'santee', 'poway', 'lemon grove', 'spring valley', 'lakeside', 'ramona', 'vista', 'san marcos', 'carlsbad', 'del mar', 'solana beach', 'coronado', 'imperial beach', 'bonita'];
+
+    const allTransformed = (data.results || []).map(transformDoctor);
+
+    // Filter to San Diego county only when searching all of SD
+    const results = cityFilter.toLowerCase() === 'san diego'
+      ? allTransformed.filter(d => SD_CITIES.includes(d.city.toLowerCase()))
+      : allTransformed;
 
     return res.status(200).json({
       results,
