@@ -6,8 +6,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { createWriteStream, createReadStream, unlinkSync, existsSync } from 'fs';
 import { pipeline } from 'stream/promises';
-import { createUnzip } from 'zlib';
 import { parse } from 'csv-parse';
+import unzipper from 'unzipper';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -135,7 +135,7 @@ async function downloadFile(url, destPath) {
 // ── PARSE AND IMPORT ─────────────────────────────────────────────────────────
 async function importProviders(zipPath) {
   console.log('🔍 Parsing NPI data and filtering to San Diego county...');
-  
+
   let processed = 0;
   let imported = 0;
   let batch = [];
@@ -143,11 +143,9 @@ async function importProviders(zipPath) {
 
   async function flushBatch() {
     if (batch.length === 0) return;
-    
     const { error } = await supabase
       .from('providers')
       .upsert(batch, { onConflict: 'npi' });
-    
     if (error) {
       console.error('❌ Batch insert error:', error.message);
     } else {
@@ -157,10 +155,17 @@ async function importProviders(zipPath) {
     batch = [];
   }
 
-  await new Promise((resolve, reject) => {
-    const gunzip = createUnzip();
-    const fileStream = createReadStream(zipPath);
+  // Open the zip and find the CSV file inside
+  const directory = await unzipper.Open.file(zipPath);
+  const csvFile = directory.files.find(f => f.path.endsWith('.csv') && f.path.includes('npidata'));
 
+  if (!csvFile) {
+    throw new Error('Could not find NPI CSV file inside zip. Files found: ' + directory.files.map(f => f.path).join(', '));
+  }
+
+  console.log(`📄 Found CSV: ${csvFile.path}`);
+
+  await new Promise((resolve, reject) => {
     const parser = parse({
       columns: true,
       skip_empty_lines: true,
@@ -169,22 +174,17 @@ async function importProviders(zipPath) {
 
     parser.on('data', async (row) => {
       processed++;
+      if (processed % 500000 === 0) console.log(`  ... processed ${processed.toLocaleString()} rows`);
 
-      // Only individual providers
       if (row['Entity Type Code'] !== INDIVIDUAL_ENTITY_TYPE) return;
-
-      // Only CA providers
       if (row['Provider Business Practice Location Address State Name'] !== 'CA') return;
 
-      // Only San Diego zip codes
       const zip = (row['Provider Business Practice Location Address Postal Code'] || '').slice(0, 5);
       if (!SD_ZIPS.has(zip)) return;
 
-      // Only medical providers
       const taxonomyCode = row['Healthcare Provider Taxonomy Code_1'] || '';
       if (!isMedicalProvider(taxonomyCode)) return;
 
-      // Only active records
       if (row['NPI Deactivation Date']) return;
 
       const npi = row['NPI'];
@@ -223,8 +223,7 @@ async function importProviders(zipPath) {
 
     parser.on('error', reject);
 
-    // Pipe: zip file → gunzip → csv parser
-    pipeline(fileStream, gunzip, parser).catch(reject);
+    csvFile.stream().pipe(parser);
   });
 
   return imported;
