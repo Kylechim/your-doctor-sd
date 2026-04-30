@@ -81,20 +81,43 @@ function formatPhone(phone) {
 // ── DOWNLOAD NPI FILE ────────────────────────────────────────────────────────
 async function getNPIDownloadUrl() {
   console.log('📡 Finding latest NPI data file...');
-  
-  // CMS publishes monthly NPI files — fetch the download page to get latest URL
-  const res = await fetch('https://download.cms.gov/nppes/NPI_Files.html');
-  const html = await res.text();
-  
-  // Find the full replacement file download link
-  const match = html.match(/href="(https:\/\/download\.cms\.gov\/nppes\/NPPES_Data_Dissemination_[^"]+\.zip)"/);
-  
-  if (!match) {
-    throw new Error('Could not find NPI download URL on CMS website');
+
+  // Try to scrape the CMS page first
+  try {
+    const res = await fetch('https://download.cms.gov/nppes/NPI_Files.html', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; YourDoctorSD/1.0)' }
+    });
+    const html = await res.text();
+
+    // Try multiple patterns to find the download link
+    const patterns = [
+      /href="(https?:\/\/download\.cms\.gov\/nppes\/NPPES_Data_Dissemination_[^"]+\.zip)"/,
+      /href="(\/nppes\/NPPES_Data_Dissemination_[^"]+\.zip)"/,
+      /(NPPES_Data_Dissemination_[A-Za-z0-9_]+\.zip)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match) {
+        let url = match[1];
+        if (url.startsWith('/')) url = 'https://download.cms.gov' + url;
+        if (!url.startsWith('http')) url = 'https://download.cms.gov/nppes/' + url;
+        console.log(`✅ Found NPI file: ${url}`);
+        return url;
+      }
+    }
+  } catch (e) {
+    console.log('Could not scrape CMS page, using direct URL...');
   }
-  
-  console.log(`✅ Found NPI file: ${match[1]}`);
-  return match[1];
+
+  // Fallback: build URL from current date (CMS uses format: NPPES_Data_Dissemination_MonthYYYY)
+  const now = new Date();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const month = months[now.getMonth()];
+  const year = now.getFullYear();
+  const url = `https://download.cms.gov/nppes/NPPES_Data_Dissemination_${month}_${year}.zip`;
+  console.log(`✅ Using direct URL: ${url}`);
+  return url;
 }
 
 async function downloadFile(url, destPath) {
