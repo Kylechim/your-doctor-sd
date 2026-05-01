@@ -1,6 +1,33 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { SPECIALTIES, NEIGHBORHOODS, ALL_LANGUAGES, COLORS as C } from "../data/doctors";
+import { NEIGHBORHOODS, ALL_LANGUAGES, COLORS as C } from "../data/doctors";
+
+const SPECIALTIES = [
+  "All Specialties",
+  "Primary Care",
+  "Family Medicine",
+  "Internal Medicine",
+  "Pediatrics",
+  "Cardiology",
+  "Dermatology",
+  "Mental Health / Psychiatry",
+  "OB-GYN",
+  "Orthopedics",
+  "Neurology",
+  "Gastroenterology",
+  "Oncology",
+  "Endocrinology",
+  "ENT",
+  "Ophthalmology",
+  "Physical Therapy",
+  "Chiropractic",
+  "Optometry",
+  "Dentistry",
+  "Pulmonology",
+  "Rheumatology",
+  "Urology",
+  "Other...",
+];
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(window.innerWidth < 640);
@@ -72,13 +99,22 @@ function DoctorCard({ doc, isMobile }) {
   );
 }
 
-function FilterPanel({ specialty, setSpecialty, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
+function FilterPanel({ specialty, setSpecialty, otherSpecialty, setOtherSpecialty, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
   const sel = { width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Specialty</div>
         <select value={specialty} onChange={e => setSpecialty(e.target.value)} style={sel}>{SPECIALTIES.map(s => <option key={s}>{s}</option>)}</select>
+        {specialty === "Other..." && (
+          <input
+            value={otherSpecialty}
+            onChange={e => setOtherSpecialty(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && onSearch()}
+            placeholder="Type a specialty..."
+            style={{ ...sel, marginTop: 6, background: "white", borderColor: C.sky }}
+          />
+        )}
       </div>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Gender</div>
@@ -126,6 +162,7 @@ export default function Search() {
   const [sort, setSort] = useState("name");
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [otherSpecialty, setOtherSpecialty] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -134,7 +171,8 @@ export default function Search() {
   const fetchDoctors = useCallback(async () => {
     setLoading(true); setError(""); setResults([]); setPage(1);
     const params = new URLSearchParams();
-    const searchQuery = specialty !== "All Specialties" ? specialty : (typeof query === "string" ? query.replace("[object Object]", "") : "");
+    const effectiveSpecialty = specialty === "Other..." ? otherSpecialty : specialty;
+    const searchQuery = effectiveSpecialty !== "All Specialties" ? effectiveSpecialty : (typeof query === "string" ? query.replace("[object Object]", "") : "");
     if (searchQuery) params.set("specialty", searchQuery);
     if (neighborhood && neighborhood !== "All of San Diego") params.set("city", neighborhood);
     params.set("limit", "500");
@@ -152,7 +190,7 @@ export default function Search() {
     } finally {
       setLoading(false);
     }
-  }, [query, neighborhood, specialty, gender, sort]);
+  }, [query, neighborhood, specialty, otherSpecialty, gender, sort]);
 
   useEffect(() => { fetchDoctors(); }, []);
 
@@ -160,7 +198,7 @@ export default function Search() {
   const pageData = results.slice((page - 1) * perPage, page * perPage);
   const activeFilterCount = [specialty !== "All Specialties", gender !== "", accepting, telehealth, neighborhood !== "All of San Diego", selectedLangs.length > 0].filter(Boolean).length;
 
-  function clearAll() { setQuery(""); setSpecialty("All Specialties"); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
+  function clearAll() { setQuery(""); setSpecialty("All Specialties"); setOtherSpecialty(""); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
 
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", background: C.bg, minHeight: "100vh" }}>
@@ -195,7 +233,7 @@ export default function Search() {
             <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Neighborhood</div>
             <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} style={{ width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" }}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
           </div>
-          <FilterPanel specialty={specialty} setSpecialty={setSpecialty} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} isMobile />
+          <FilterPanel specialty={specialty} setSpecialty={setSpecialty} otherSpecialty={otherSpecialty} setOtherSpecialty={setOtherSpecialty} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} isMobile />
         </div>
       </>}
 
@@ -204,7 +242,7 @@ export default function Search() {
           <aside style={{ width: 200, flexShrink: 0 }}>
             <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "1.1rem", position: "sticky", top: 72 }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 14 }}>Filters</div>
-              <FilterPanel specialty={specialty} setSpecialty={setSpecialty} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={clearAll} onSearch={fetchDoctors} isMobile={false} />
+              <FilterPanel specialty={specialty} setSpecialty={setSpecialty} otherSpecialty={otherSpecialty} setOtherSpecialty={setOtherSpecialty} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={clearAll} onSearch={fetchDoctors} isMobile={false} />
               <button onClick={fetchDoctors} style={{ width: "100%", marginTop: 10, background: C.ocean, color: "white", border: "none", padding: "0.6rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Apply Filters</button>
             </div>
           </aside>
