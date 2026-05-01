@@ -114,8 +114,9 @@ export default function Search() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const urlQuery = searchParams.get("q") || "";
-  const [query, setQuery] = useState(typeof urlQuery === "string" ? urlQuery : "");
+  const rawQuery = searchParams.get("q") || "";
+  const urlQuery = rawQuery.includes("object") ? "" : rawQuery;
+  const [query, setQuery] = useState(urlQuery);
   const [neighborhood, setNeighborhood] = useState(searchParams.get("city") || "All of San Diego");
   const [specialty, setSpecialty] = useState("All Specialties");
   const [gender, setGender] = useState("");
@@ -133,8 +134,8 @@ export default function Search() {
   const fetchDoctors = useCallback(async () => {
     setLoading(true); setError(""); setResults([]); setPage(1);
     const params = new URLSearchParams();
-    const searchQuery = specialty !== "All Specialties" ? specialty : (typeof query === "string" ? query : "");
-    if (searchQuery && searchQuery !== "[object Object]") params.set("specialty", searchQuery);
+    const searchQuery = specialty !== "All Specialties" ? specialty : (typeof query === "string" ? query.replace("[object Object]", "") : "");
+    if (searchQuery) params.set("specialty", searchQuery);
     if (neighborhood && neighborhood !== "All of San Diego") params.set("city", neighborhood);
     params.set("limit", "500");
     try {
@@ -159,7 +160,7 @@ export default function Search() {
   const pageData = results.slice((page - 1) * perPage, page * perPage);
   const activeFilterCount = [specialty !== "All Specialties", gender !== "", accepting, telehealth, neighborhood !== "All of San Diego", selectedLangs.length > 0].filter(Boolean).length;
 
-  function clearAll() { setQuery("Primary Care"); setSpecialty("All Specialties"); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
+  function clearAll() { setQuery(""); setSpecialty("All Specialties"); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
 
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", background: C.bg, minHeight: "100vh" }}>
