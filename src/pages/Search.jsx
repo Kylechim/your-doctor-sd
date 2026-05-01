@@ -1,33 +1,114 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { NEIGHBORHOODS, ALL_LANGUAGES, COLORS as C } from "../data/doctors";
 
-const SPECIALTIES = [
-  "All Specialties",
-  "Primary Care",
-  "Family Medicine",
-  "Internal Medicine",
-  "Pediatrics",
-  "Cardiology",
-  "Dermatology",
-  "Mental Health / Psychiatry",
-  "OB-GYN",
-  "Orthopedics",
-  "Neurology",
-  "Gastroenterology",
-  "Oncology",
-  "Endocrinology",
-  "ENT",
-  "Ophthalmology",
-  "Physical Therapy",
-  "Chiropractic",
-  "Optometry",
-  "Dentistry",
-  "Pulmonology",
-  "Rheumatology",
-  "Urology",
-  "Other...",
-];
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
+
+
+
+
+// ── SPECIALTY AUTOCOMPLETE ──────────────────────────────────────────────────
+function SpecialtySearch({ value, onChange, onSelect, supabaseUrl, supabaseKey }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef(null);
+  const debounceRef = useRef(null);
+
+  async function fetchSuggestions(term) {
+    if (!term || term.length < 2) { setSuggestions([]); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/rpc/get_specialties`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({ search_term: term }),
+        }
+      );
+      const data = await res.json();
+      setSuggestions(data || []);
+      setShowSuggestions(true);
+    } catch (e) {
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleChange(e) {
+    const val = e.target.value;
+    onChange(val);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 250);
+  }
+
+  function handleSelect(specialty) {
+    onChange(specialty);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    onSelect(specialty);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Escape') { setShowSuggestions(false); }
+    if (e.key === 'Enter') { setShowSuggestions(false); onSelect(value); }
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => value.length >= 2 && setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          placeholder="Type a specialty or condition..."
+          style={{
+            width: '100%', padding: '0.55rem 2rem 0.55rem 0.8rem',
+            border: `1.5px solid ${C.sky}`, borderRadius: 8,
+            fontFamily: 'inherit', fontSize: 13, outline: 'none',
+            background: 'white', boxSizing: 'border-box',
+          }}
+        />
+        {loading && (
+          <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, border: `2px solid rgba(26,107,138,0.2)`, borderTopColor: C.ocean, borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+        )}
+      </div>
+      {showSuggestions && suggestions.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 500,
+          background: 'white', border: `1.5px solid ${C.border}`,
+          borderRadius: 8, boxShadow: '0 8px 24px rgba(13,61,82,0.12)',
+          marginTop: 4, maxHeight: 280, overflowY: 'auto',
+        }}>
+          {suggestions.map((s, i) => (
+            <div key={i} onMouseDown={() => handleSelect(s.specialty)} style={{
+              padding: '0.6rem 0.9rem', cursor: 'pointer', fontSize: 13,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              borderBottom: i < suggestions.length - 1 ? `1px solid ${C.border}` : 'none',
+              transition: 'background 0.1s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f0f8fb'}
+              onMouseLeave={e => e.currentTarget.style.background = 'white'}
+            >
+              <span style={{ color: C.deep, fontWeight: 500 }}>{s.specialty}</span>
+              <span style={{ fontSize: 11, color: C.muted }}>{s.count} providers</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(window.innerWidth < 640);
@@ -99,22 +180,18 @@ function DoctorCard({ doc, isMobile }) {
   );
 }
 
-function FilterPanel({ specialty, setSpecialty, otherSpecialty, setOtherSpecialty, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
-  const sel = { width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" };
+function FilterPanel({ specialtySearch, setSpecialtySearch, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Specialty</div>
-        <select value={specialty} onChange={e => setSpecialty(e.target.value)} style={sel}>{SPECIALTIES.map(s => <option key={s}>{s}</option>)}</select>
-        {specialty === "Other..." && (
-          <input
-            value={otherSpecialty}
-            onChange={e => setOtherSpecialty(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && onSearch()}
-            placeholder="Type a specialty..."
-            style={{ ...sel, marginTop: 6, background: "white", borderColor: C.sky }}
-          />
-        )}
+        <SpecialtySearch
+          value={specialtySearch}
+          onChange={setSpecialtySearch}
+          onSelect={(s) => { setSpecialtySearch(s); onSearch(); }}
+          supabaseUrl={SUPABASE_URL}
+          supabaseKey={SUPABASE_ANON_KEY}
+        />
       </div>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Gender</div>
@@ -154,7 +231,7 @@ export default function Search() {
   const urlQuery = rawQuery.includes("object") ? "" : rawQuery;
   const [query, setQuery] = useState(urlQuery);
   const [neighborhood, setNeighborhood] = useState(searchParams.get("city") || "All of San Diego");
-  const [specialty, setSpecialty] = useState("All Specialties");
+  const [specialtySearch, setSpecialtySearch] = useState("");
   const [gender, setGender] = useState("");
   const [accepting, setAccepting] = useState(false);
   const [telehealth, setTelehealth] = useState(false);
@@ -162,7 +239,6 @@ export default function Search() {
   const [sort, setSort] = useState("name");
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
-  const [otherSpecialty, setOtherSpecialty] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -171,8 +247,7 @@ export default function Search() {
   const fetchDoctors = useCallback(async () => {
     setLoading(true); setError(""); setResults([]); setPage(1);
     const params = new URLSearchParams();
-    const effectiveSpecialty = specialty === "Other..." ? otherSpecialty : specialty;
-    const searchQuery = effectiveSpecialty !== "All Specialties" ? effectiveSpecialty : (typeof query === "string" ? query.replace("[object Object]", "") : "");
+    const searchQuery = specialtySearch || (typeof query === "string" ? query.replace("[object Object]", "") : "");
     if (searchQuery) params.set("specialty", searchQuery);
     if (neighborhood && neighborhood !== "All of San Diego") params.set("city", neighborhood);
     params.set("limit", "500");
@@ -190,15 +265,15 @@ export default function Search() {
     } finally {
       setLoading(false);
     }
-  }, [query, neighborhood, specialty, otherSpecialty, gender, sort]);
+  }, [query, neighborhood, specialtySearch, gender, sort]);
 
   useEffect(() => { fetchDoctors(); }, []);
 
   const totalPages = Math.ceil(results.length / perPage);
   const pageData = results.slice((page - 1) * perPage, page * perPage);
-  const activeFilterCount = [specialty !== "All Specialties", gender !== "", accepting, telehealth, neighborhood !== "All of San Diego", selectedLangs.length > 0].filter(Boolean).length;
+  const activeFilterCount = [specialtySearch !== "", gender !== "", accepting, telehealth, neighborhood !== "All of San Diego", selectedLangs.length > 0].filter(Boolean).length;
 
-  function clearAll() { setQuery(""); setSpecialty("All Specialties"); setOtherSpecialty(""); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
+  function clearAll() { setQuery(""); setSpecialtySearch(""); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
 
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", background: C.bg, minHeight: "100vh" }}>
@@ -238,7 +313,7 @@ export default function Search() {
             <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Neighborhood</div>
             <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} style={{ width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" }}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
           </div>
-          <FilterPanel specialty={specialty} setSpecialty={setSpecialty} otherSpecialty={otherSpecialty} setOtherSpecialty={setOtherSpecialty} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} isMobile />
+          <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} isMobile />
         </div>
       </>}
 
@@ -247,7 +322,7 @@ export default function Search() {
           <aside style={{ width: 200, flexShrink: 0 }}>
             <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "1.1rem", position: "sticky", top: 72 }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 14 }}>Filters</div>
-              <FilterPanel specialty={specialty} setSpecialty={setSpecialty} otherSpecialty={otherSpecialty} setOtherSpecialty={setOtherSpecialty} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={clearAll} onSearch={fetchDoctors} isMobile={false} />
+              <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={clearAll} onSearch={fetchDoctors} isMobile={false} />
               <button onClick={fetchDoctors} style={{ width: "100%", marginTop: 10, background: C.ocean, color: "white", border: "none", padding: "0.6rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Apply Filters</button>
             </div>
           </aside>
