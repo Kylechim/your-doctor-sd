@@ -135,7 +135,7 @@ export default function Search() {
     const searchQuery = specialty !== "All Specialties" ? specialty : query;
     if (searchQuery) params.set("specialty", searchQuery);
     if (neighborhood && neighborhood !== "All of San Diego") params.set("city", neighborhood);
-    params.set("limit", "100");
+    params.set("limit", "500");
     try {
       const res = await fetch(`/api/search?${params.toString()}`);
       const data = await res.json();
