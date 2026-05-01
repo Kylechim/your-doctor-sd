@@ -12,9 +12,9 @@ function useIsMobile() {
   return mobile;
 }
 
-function Pill({ icon, text, green, red }) {
+function Pill({ icon, text, green, red, blue }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, padding: "3px 9px", borderRadius: 20, fontWeight: 500, background: green ? "#edfaf3" : red ? "#fff0f0" : "#f0f8fb", color: green ? "#1a7a4a" : red ? "#c05050" : C.muted, border: `1px solid ${green ? "#b2e5cc" : red ? "#f5c0c0" : C.border}`, whiteSpace: "nowrap" }}>{icon} {text}</span>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, padding: "3px 9px", borderRadius: 20, fontWeight: 500, background: green ? "#edfaf3" : red ? "#fff0f0" : blue ? "rgba(26,107,138,0.08)" : "#f0f8fb", color: green ? "#1a7a4a" : red ? "#c05050" : blue ? "#1a6b8a" : C.muted, border: `1px solid ${green ? "#b2e5cc" : red ? "#f5c0c0" : blue ? "rgba(26,107,138,0.2)" : C.border}`, whiteSpace: "nowrap" }}>{icon} {text}</span>
   );
 }
 
@@ -51,10 +51,13 @@ function DoctorCard({ doc, isMobile }) {
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: "0.7rem" }}>
-        <Pill icon="✅" text="Accepting" green />
+        {doc.accepting === true && <Pill icon="✅" text="Accepting" green />}
+        {doc.accepting === false && <Pill icon="❌" text="Not Accepting" red />}
+        {doc.accepting === null && <Pill icon="❓" text="Not yet reported" />}
+        {doc.telehealth === true && <Pill icon="💻" text="Telehealth" />}
+        {doc.verified && <Pill icon="🏅" text="Verified" blue />}
         {doc.gender === "F" && <Pill icon="👩‍⚕️" text="Female" />}
         {doc.gender === "M" && <Pill icon="👨‍⚕️" text="Male" />}
-        <Pill icon="🗣️" text="English" />
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.6rem" }}>
         <div style={{ fontSize: 10, color: "#9ab5bf" }}>📋 {doc.address}{doc.address && ", "}{doc.city} · NPI {doc.npi}</div>
