@@ -100,8 +100,8 @@ function buildDoctor(row, claimed) {
     address: toProperCase(row.address || ''),
     phone: formatPhone(row.phone) || 'Call for number',
     gender: row.gender || null,
-    accepting: claimed?.accepting_patients ?? null,
-    telehealth: claimed?.telehealth ?? null,
+    accepting: claimed ? (claimed.accepting_patients ?? null) : null,
+    telehealth: claimed ? (claimed.telehealth ?? null) : null,
     languages: claimed?.languages ?? ['English'],
     insurance: claimed?.insurance ?? [],
     hours: claimed?.hours ?? null,
@@ -115,7 +115,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-  const { specialty, city, name, gender, limit = '50', offset = '0' } = req.query;
+  const { specialty, city, name, gender, limit = '200', offset = '0' } = req.query;
 
   try {
     let query = supabase
