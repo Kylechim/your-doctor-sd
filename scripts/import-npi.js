@@ -356,7 +356,14 @@ async function importProviders(zipPath) {
       relax_column_count: true,
     });
 
+    let headersLogged = false;
     parser.on('data', async (row) => {
+      if (!headersLogged) {
+        const genderKeys = Object.keys(row).filter(k => k.toLowerCase().includes('gender'));
+        console.log('Gender-related columns:', genderKeys);
+        console.log('Sample gender value:', genderKeys.map(k => `${k}: ${row[k]}`));
+        headersLogged = true;
+      }
       processed++;
       if (processed % 500000 === 0) console.log(`  ... processed ${processed.toLocaleString()} rows`);
 
@@ -379,7 +386,7 @@ async function importProviders(zipPath) {
         first_name: toProperCase(row['Provider First Name'] || ''),
         last_name: toProperCase(row['Provider Last Name (Legal Name)'] || ''),
         credential: row['Provider Credential Text'] || '',
-        gender: row['Provider Gender Code'] || null,
+        gender: row['Provider Gender Code'] || row['provider_gender_code'] || null,
         specialty: getTaxonomyName(row['Healthcare Provider Taxonomy Code_1'] || ''),
         address: toProperCase(row['Provider First Line Business Practice Location Address'] || ''),
         city: toProperCase(row['Provider Business Practice Location Address City Name'] || ''),
