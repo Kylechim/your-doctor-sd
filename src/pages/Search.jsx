@@ -205,11 +205,16 @@ export default function Search() {
       <nav style={{ position: "sticky", top: 0, zIndex: 200, background: "rgba(253,250,245,0.97)", backdropFilter: "blur(12px)", borderBottom: `1px solid rgba(26,107,138,0.12)`, padding: isMobile ? "0.75rem 1rem" : "0.8rem 1.2rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: isMobile ? "0.6rem" : 0 }}>
           <div onClick={() => navigate("/")} style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 17 : 19, color: C.ocean, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Your Doctor <span style={{ color: C.dusk }}>SD</span></div>
-          {!isMobile && <>
-            <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && fetchDoctors()} placeholder="Search by specialty or doctor name…" style={{ flex: 1, padding: "0.5rem 0.9rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, outline: "none", background: "white" }} />
-            <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} style={{ padding: "0.5rem 0.8rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "white", outline: "none", appearance: "none" }}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
-            <button onClick={fetchDoctors} style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, color: "white", border: "none", padding: "0.5rem 1.2rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🔍 Search</button>
-          </>}
+          {!isMobile && (
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 15, color: C.muted, fontStyle: "italic", letterSpacing: "0.01em" }}>
+                Finding care, made simple.
+              </span>
+              <select value={neighborhood} onChange={e => { setNeighborhood(e.target.value); setPage(1); }} style={{ padding: "0.5rem 0.8rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "white", outline: "none", appearance: "none" }}>
+                {NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         {isMobile && (
           <div style={{ display: "flex", gap: "0.5rem" }}>
