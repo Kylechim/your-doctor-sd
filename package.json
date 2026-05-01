@@ -2,7 +2,6 @@
   "name": "your-doctor-sd",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "csv-parse": "^5.5.3",
@@ -15,7 +14,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "import-npi": "node scripts/import-npi.js"
+    "import-npi": "node --experimental-vm-modules scripts/import-npi.js"
   },
   "browserslist": {
     "production": [">0.2%", "not dead", "not op_mini all"],
