@@ -1,28 +1,18 @@
 // api/search.js
-// Vercel Serverless Function — runs on the server, no CORS issues
-// Called by the frontend at /api/search?specialty=Cardiology&city=San+Diego
+// Queries our Supabase database of 40,000+ San Diego providers
+// Much faster than calling the NPI registry directly
 
-const TAXONOMY_MAP = {
-  'family medicine': 'Family Medicine*',
-  'primary care': 'Family Medicine*',
-  'internal medicine': 'Internal Medicine*',
-  'pediatrics': 'Pediatrics*',
-  'cardiology': 'Cardiovascular*',
-  'dermatology': 'Dermatology*',
-  'orthopedics': 'Orthopaedic*',
-  'psychiatry': 'Psychiatry*',
-  'gastroenterology': 'Gastroenterology*',
-  'ob-gyn': 'Obstetrics*',
-  'obgyn': 'Obstetrics*',
-  'neurology': 'Neurology*',
-  'oncology': 'Oncology*',
-  'endocrinology': 'Endocrinology*',
-  'pulmonology': 'Pulmonary*',
-  'ophthalmology': 'Ophthalmology*',
-  'ent': 'Otolaryngology*',
-  'rheumatology': 'Rheumatology*',
-  'urology': 'Urology*',
-};
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
+function toProperCase(str) {
+  if (!str) return '';
+  return str.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+}
 
 function formatPhone(phone) {
   if (!phone) return null;
@@ -31,110 +21,104 @@ function formatPhone(phone) {
   return phone;
 }
 
-function getSpecialty(taxonomies) {
-  if (!taxonomies || !taxonomies.length) return 'General Practice';
-  const primary = taxonomies.find(t => t.primary) || taxonomies[0];
-  return primary?.desc || 'General Practice';
-}
-
-function toProperCase(str) {
-  if (!str) return '';
-  return str.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
-}
-
-function transformDoctor(raw, index) {
-  const b = raw.basic || {};
-  const addr = raw.addresses?.find(a => a.address_purpose === 'LOCATION') || raw.addresses?.[0] || {};
-  const phone = formatPhone(addr.telephone_number);
-  const firstName = toProperCase(b.first_name || '');
-  const lastName = toProperCase(b.last_name || '');
-  const credential = b.credential || 'MD';
+function buildDoctor(row, claimed) {
+  const firstName = toProperCase(row.first_name || '');
+  const lastName = toProperCase(row.last_name || '');
+  const credential = row.credential || 'MD';
   const name = `Dr. ${firstName} ${lastName}, ${credential}`.trim();
 
   return {
-    id: raw.number || index,
+    id: row.npi,
+    npi: row.npi,
     name,
-    specialty: getSpecialty(raw.taxonomies),
-    city: addr.city ? addr.city.replace(/\b\w/g, l => l.toUpperCase()) : 'San Diego',
-    address: addr.address_1 || '',
-    phone: phone || 'Call for number',
-    gender: b.gender || null,
-    npi: raw.number || '',
-    accepting: true, // NPI doesn't provide this — community reports will update it
-    telehealth: false, // Same — community driven
-    languages: ['English'], // NPI doesn't provide this either
+    specialty: toProperCase(row.specialty || 'General Practice'),
+    city: toProperCase(row.city || 'San Diego'),
+    address: toProperCase(row.address || ''),
+    phone: formatPhone(row.phone) || 'Call for number',
+    gender: row.gender || null,
+    // Layer 2: claimed listing data on top of NPI base data
+    accepting: claimed?.accepting_patients ?? null,
+    telehealth: claimed?.telehealth ?? null,
+    languages: claimed?.languages ?? ['English'],
+    insurance: claimed?.insurance ?? [],
+    hours: claimed?.hours ?? null,
+    photo_url: claimed?.photo_url ?? null,
+    bio: claimed?.bio ?? null,
+    verified: claimed ? true : false,
   };
 }
 
 export default async function handler(req, res) {
-  // Allow requests from our frontend
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-  const { specialty, city, name, limit = '25' } = req.query;
+  const { specialty, city, name, gender, limit = '50', offset = '0' } = req.query;
 
   if (!specialty && !name) {
-    return res.status(400).json({ error: 'Please provide a specialty or name to search.' });
+    return res.status(400).json({ error: 'Please provide a specialty or name.' });
   }
 
   try {
-    const params = new URLSearchParams({
-      version: '2.1',
-      enumeration_type: 'NPI-1',
-      limit: Math.min(parseInt(limit), 200).toString(),
-      state: 'CA',
-    });
+    let query = supabase
+      .from('providers')
+      .select('*', { count: 'exact' })
+      .limit(parseInt(limit))
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    // Specialty search
+    if (specialty && specialty !== 'All Specialties') {
+      query = query.ilike('specialty', `%${specialty}%`);
+    }
+
+    // Name search
+    if (name) {
+      const cleanName = name.replace(/^dr\.?\s*/i, '').trim();
+      query = query.or(`first_name.ilike.%${cleanName}%,last_name.ilike.%${cleanName}%`);
+    }
 
     // City filter
-    const cityFilter = city && city !== 'All of San Diego' ? city : 'San Diego';
-    params.set('city', cityFilter);
+    if (city && city !== 'All of San Diego') {
+      query = query.ilike('city', city);
+    }
 
-    if (name) {
-      // Name search — split into first/last
-      const parts = name.trim().replace(/^dr\.?\s*/i, '').split(/\s+/);
-      if (parts.length >= 2) {
-        params.set('first_name', parts[0] + '*');
-        params.set('last_name', parts[parts.length - 1] + '*');
-      } else {
-        params.set('last_name', parts[0] + '*');
+    // Gender filter
+    if (gender && gender !== '') {
+      query = query.eq('gender', gender);
+    }
+
+    // Sort by last name
+    query = query.order('last_name', { ascending: true });
+
+    const { data: providers, error, count } = await query;
+
+    if (error) throw error;
+
+    // Fetch any claimed listings for these providers
+    const npis = (providers || []).map(p => p.npi);
+    let claimedMap = {};
+
+    if (npis.length > 0) {
+      const { data: claimed } = await supabase
+        .from('claimed_listings')
+        .select('*')
+        .in('npi', npis)
+        .eq('verified', true);
+
+      if (claimed) {
+        claimedMap = Object.fromEntries(claimed.map(c => [c.npi, c]));
       }
-    } else {
-      // Specialty search — map to NPI taxonomy description
-      const key = specialty.toLowerCase().trim();
-      const taxonomy = TAXONOMY_MAP[key] || (specialty + '*');
-      params.set('taxonomy_description', taxonomy);
     }
 
-    const url = `https://npiregistry.cms.hhs.gov/api/?${params.toString()}`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`NPI API responded with ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.Errors) {
-      return res.status(400).json({ error: 'Invalid search parameters.', details: data.Errors });
-    }
-
-    const SD_CITIES = ['san diego', 'la jolla', 'chula vista', 'encinitas', 'oceanside', 'el cajon', 'escondido', 'national city', 'santee', 'poway', 'lemon grove', 'spring valley', 'lakeside', 'ramona', 'vista', 'san marcos', 'carlsbad', 'del mar', 'solana beach', 'coronado', 'imperial beach', 'bonita'];
-
-    const allTransformed = (data.results || []).map(transformDoctor);
-
-    // Filter to San Diego county only when searching all of SD
-    const results = cityFilter.toLowerCase() === 'san diego'
-      ? allTransformed.filter(d => SD_CITIES.includes(d.city.toLowerCase()))
-      : allTransformed;
+    const results = (providers || []).map(p => buildDoctor(p, claimedMap[p.npi]));
 
     return res.status(200).json({
       results,
-      total: data.result_count || results.length,
-      query: { specialty, city: cityFilter, name },
+      total: count || results.length,
+      query: { specialty, city, name, gender },
     });
 
   } catch (err) {
-    console.error('NPI fetch error:', err);
-    return res.status(500).json({ error: 'Failed to reach the NPI registry. Please try again.' });
+    console.error('Supabase query error:', err);
+    return res.status(500).json({ error: 'Search failed. Please try again.' });
   }
 }
