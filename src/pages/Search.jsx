@@ -114,7 +114,8 @@ export default function Search() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [query, setQuery] = useState(searchParams.get("q") || "Primary Care");
+  const urlQuery = searchParams.get("q") || "";
+  const [query, setQuery] = useState(typeof urlQuery === "string" ? urlQuery : "");
   const [neighborhood, setNeighborhood] = useState(searchParams.get("city") || "All of San Diego");
   const [specialty, setSpecialty] = useState("All Specialties");
   const [gender, setGender] = useState("");
@@ -132,8 +133,8 @@ export default function Search() {
   const fetchDoctors = useCallback(async () => {
     setLoading(true); setError(""); setResults([]); setPage(1);
     const params = new URLSearchParams();
-    const searchQuery = specialty !== "All Specialties" ? specialty : query;
-    if (searchQuery) params.set("specialty", searchQuery);
+    const searchQuery = specialty !== "All Specialties" ? specialty : (typeof query === "string" ? query : "");
+    if (searchQuery && searchQuery !== "[object Object]") params.set("specialty", searchQuery);
     if (neighborhood && neighborhood !== "All of San Diego") params.set("city", neighborhood);
     params.set("limit", "500");
     try {
