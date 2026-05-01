@@ -181,6 +181,7 @@ function DoctorCard({ doc, isMobile }) {
 }
 
 function FilterPanel({ specialtySearch, setSpecialtySearch, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
+  const sel = { width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
