@@ -33,10 +33,11 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [isMobile]);
 
-  function handleSearch() {
+  function handleSearch(overrideQuery) {
     const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (neighborhood) params.set("city", neighborhood);
+    const q = overrideQuery || query;
+    if (q) params.set("q", q);
+    if (neighborhood && neighborhood !== "All of San Diego") params.set("city", neighborhood);
     navigate(`/search?${params.toString()}`);
   }
 
@@ -136,7 +137,7 @@ export default function Home() {
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: "0.8rem" }}>
               <span style={{ fontSize: 12, color: C.muted }}>Popular:</span>
               {["Primary Care","Pediatrics","Spanish-speaking","Accepting Patients","Telehealth"].map(tag => (
-                <button key={tag} onClick={() => { setQuery(tag); handleSearch(); }}
+                <button key={tag} onClick={() => { navigate(`/search?q=${encodeURIComponent(tag)}`); }}
                   style={{ fontSize: 12, padding: "3px 10px", borderRadius: 20, background: "rgba(26,107,138,0.07)", color: C.ocean, border: "1px solid rgba(26,107,138,0.15)", cursor: "pointer", fontFamily: "inherit" }}>
                   {tag}
                 </button>
@@ -153,7 +154,7 @@ export default function Home() {
 
       {/* TRUST BAR */}
       <div style={{ background: C.deep, color: "rgba(255,255,255,0.75)", display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "2rem", padding: "1.2rem 2rem" }}>
-        {[["🏥","3,400+","San Diego Providers"],["💳","50+","Insurance Plans"],["🌎","30+","Languages Spoken"],["✅","Always","Free for Patients"]].map(([icon, strong, label]) => (
+        {[["🏥","40,000+","San Diego Providers"],["💳","50+","Insurance Plans"],["🌎","30+","Languages Spoken"],["✅","Always","Free for Patients"]].map(([icon, strong, label]) => (
           <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 14 }}>
             <span>{icon}</span><strong style={{ color: "white" }}>{strong}</strong>&nbsp;{label}
           </div>
