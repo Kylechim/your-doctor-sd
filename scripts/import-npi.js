@@ -359,9 +359,10 @@ async function importProviders(zipPath) {
     let headersLogged = false;
     parser.on('data', async (row) => {
       if (!headersLogged) {
-        const genderKeys = Object.keys(row).filter(k => k.toLowerCase().includes('gender'));
-        console.log('Gender-related columns:', genderKeys);
-        console.log('Sample gender value:', genderKeys.map(k => `${k}: ${row[k]}`));
+        const allKeys = Object.keys(row);
+        console.log('All CSV columns:', JSON.stringify(allKeys.slice(0, 30)));
+        const providerKeys = allKeys.filter(k => k.toLowerCase().includes('provider'));
+        console.log('Provider columns:', JSON.stringify(providerKeys.slice(0, 20)));
         headersLogged = true;
       }
       processed++;
