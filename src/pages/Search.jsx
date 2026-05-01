@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Nav from "../components/Nav";
-import { COLORS as C } from "../data/doctors";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { SPECIALTIES, NEIGHBORHOODS, ALL_LANGUAGES, COLORS as C } from "../data/doctors";
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(window.innerWidth < 640);
@@ -13,216 +12,246 @@ function useIsMobile() {
   return mobile;
 }
 
-const SLIDES = [
-  { heading: <>Find <em>your</em> doctor right here in <span style={{ color: C.dusk }}>San Diego.</span></>, sub: "Every licensed provider in San Diego — free to search, no paywalls, no paid rankings." },
-  { heading: <>Search by <em>insurance,</em> language, or <span style={{ color: C.dusk }}>neighborhood.</span></>, sub: "Filter by the things that actually matter — not just name and specialty." },
-  { heading: <>Built for <em>our</em> community. Always <span style={{ color: C.dusk }}>free.</span></>, sub: "No hidden fees. No doctor pays to rank higher. Just honest results for San Diego." },
-];
+function Pill({ icon, text, green, red, blue }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, padding: "3px 9px", borderRadius: 20, fontWeight: 500, background: green ? "#edfaf3" : red ? "#fff0f0" : blue ? "rgba(26,107,138,0.08)" : "#f0f8fb", color: green ? "#1a7a4a" : red ? "#c05050" : blue ? "#1a6b8a" : C.muted, border: `1px solid ${green ? "#b2e5cc" : red ? "#f5c0c0" : blue ? "rgba(26,107,138,0.2)" : C.border}`, whiteSpace: "nowrap" }}>{icon} {text}</span>
+  );
+}
 
-export default function Home() {
+function Spinner() {
+  return (
+    <div style={{ textAlign: "center", padding: "3rem" }}>
+      <div style={{ width: 38, height: 38, border: `3px solid rgba(26,107,138,0.15)`, borderTopColor: C.ocean, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 1rem" }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <p style={{ color: C.muted, fontSize: 14 }}>Searching San Diego providers…</p>
+    </div>
+  );
+}
+
+function DoctorCard({ doc, isMobile }) {
   const navigate = useNavigate();
+  const initials = doc.name.replace(/Dr\.\s*/, "").split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  return (
+    <div onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })} style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 14, padding: isMobile ? "1rem" : "1.1rem 1.3rem", marginBottom: "0.75rem", cursor: "pointer", transition: "box-shadow 0.2s, transform 0.2s" }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(13,61,82,0.1)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "none"; }}
+    >
+      <div style={{ display: "flex", gap: "0.8rem", alignItems: "flex-start" }}>
+        <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, background: `linear-gradient(135deg, ${C.sky}, ${C.ocean})`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 14 }}>{initials}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, color: C.deep, fontSize: isMobile ? 14 : 15, lineHeight: 1.3 }}>{doc.name}</div>
+          <div style={{ color: C.ocean, fontSize: 12, fontWeight: 500, marginTop: 2 }}>{doc.specialty}</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>📍 {doc.city}, CA{doc.phone && doc.phone !== "Call for number" && <> &nbsp;·&nbsp; 📞 {doc.phone}</>}</div>
+        </div>
+        {isMobile && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
+            {doc.phone && doc.phone !== "Call for number" && <button onClick={e => { e.stopPropagation(); window.location = `tel:${doc.phone}`; }} style={{ background: C.ocean, color: "white", border: "none", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📞 Call</button>}
+            <button onClick={e => { e.stopPropagation(); navigate(`/doctor/${doc.npi}`, { state: { doc } }); }} style={{ background: "transparent", color: C.ocean, border: `1.5px solid ${C.ocean}`, padding: "5px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer" }}>Profile</button>
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: "0.7rem" }}>
+        {doc.accepting === true && <Pill icon="✅" text="Accepting" green />}
+        {doc.accepting === false && <Pill icon="❌" text="Not Accepting" red />}
+        {doc.accepting === null && <Pill icon="❓" text="Not yet reported" />}
+        {doc.telehealth === true && <Pill icon="💻" text="Telehealth" />}
+        {doc.verified && <Pill icon="🏅" text="Verified" blue />}
+        {doc.gender === "F" && <Pill icon="👩‍⚕️" text="Female" />}
+        {doc.gender === "M" && <Pill icon="👨‍⚕️" text="Male" />}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.6rem" }}>
+        <div style={{ fontSize: 10, color: "#9ab5bf" }}>📋 {doc.address}{doc.address && ", "}{doc.city} · NPI {doc.npi}</div>
+        {!isMobile && (
+          <div style={{ display: "flex", gap: 6 }}>
+            {doc.phone && doc.phone !== "Call for number" && <button onClick={e => { e.stopPropagation(); window.location = `tel:${doc.phone}`; }} style={{ background: C.ocean, color: "white", border: "none", padding: "5px 13px", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>📞 Call</button>}
+            <button onClick={e => { e.stopPropagation(); navigate(`/doctor/${doc.npi}`, { state: { doc } }); }} style={{ background: "transparent", color: C.ocean, border: `1.5px solid ${C.ocean}`, padding: "4px 11px", borderRadius: 7, fontSize: 11, cursor: "pointer" }}>Profile</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FilterPanel({ specialty, setSpecialty, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
+  const sel = { width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Specialty</div>
+        <select value={specialty} onChange={e => setSpecialty(e.target.value)} style={sel}>{SPECIALTIES.map(s => <option key={s}>{s}</option>)}</select>
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Gender</div>
+        <select value={gender} onChange={e => setGender(e.target.value)} style={sel}><option value="">Any</option><option value="F">Female</option><option value="M">Male</option></select>
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Availability</div>
+        {[["✅ Accepting new patients", accepting, setAccepting], ["💻 Telehealth available", telehealth, setTelehealth]].map(([label, val, set]) => (
+          <label key={label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", marginBottom: 8 }}>
+            <input type="checkbox" checked={val} onChange={e => set(e.target.checked)} style={{ accentColor: C.ocean, width: 16, height: 16 }} />{label}
+          </label>
+        ))}
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Language Spoken</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {ALL_LANGUAGES.map(lang => {
+            const active = selectedLangs.includes(lang);
+            return <button key={lang} onClick={() => setSelectedLangs(active ? selectedLangs.filter(l => l !== lang) : [...selectedLangs, lang])} style={{ padding: "4px 11px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontFamily: "inherit", fontWeight: active ? 600 : 400, background: active ? C.ocean : "white", color: active ? "white" : C.text, border: `1.5px solid ${active ? C.ocean : C.border}` }}>{lang}</button>;
+          })}
+        </div>
+        {selectedLangs.length > 0 && <button onClick={() => setSelectedLangs([])} style={{ marginTop: 6, fontSize: 11, color: C.muted, background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline" }}>Clear languages</button>}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        {isMobile && <button onClick={() => { onSearch(); onApply(); }} style={{ flex: 1, background: C.ocean, color: "white", border: "none", padding: "0.65rem", borderRadius: 8, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Show Results</button>}
+        <button onClick={onClear} style={{ flex: isMobile ? 0 : 1, background: "transparent", color: C.muted, border: `1.5px solid ${C.border}`, padding: "0.6rem 1rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>Clear</button>
+      </div>
+    </div>
+  );
+}
+
+export default function Search() {
   const isMobile = useIsMobile();
-  const [slide, setSlide] = useState(0);
-  const [query, setQuery] = useState("");
-  const [neighborhood, setNeighborhood] = useState("");
-  const [touchStart, setTouchStart] = useState(null);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get("q") || "Primary Care");
+  const [neighborhood, setNeighborhood] = useState(searchParams.get("city") || "All of San Diego");
+  const [specialty, setSpecialty] = useState("All Specialties");
+  const [gender, setGender] = useState("");
+  const [accepting, setAccepting] = useState(false);
+  const [telehealth, setTelehealth] = useState(false);
+  const [selectedLangs, setSelectedLangs] = useState([]);
+  const [sort, setSort] = useState("name");
+  const [page, setPage] = useState(1);
+  const [showFilters, setShowFilters] = useState(false);
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const perPage = 10;
 
-  useEffect(() => {
-    if (!isMobile) return;
-    const timer = setInterval(() => setSlide(s => (s + 1) % SLIDES.length), 3500);
-    return () => clearInterval(timer);
-  }, [isMobile]);
-
-  function handleSearch() {
+  const fetchDoctors = useCallback(async () => {
+    setLoading(true); setError(""); setResults([]); setPage(1);
     const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (neighborhood) params.set("city", neighborhood);
-    navigate(`/search?${params.toString()}`);
-  }
+    const searchQuery = specialty !== "All Specialties" ? specialty : query;
+    if (searchQuery) params.set("specialty", searchQuery);
+    if (neighborhood && neighborhood !== "All of San Diego") params.set("city", neighborhood);
+    params.set("limit", "500");
+    try {
+      const res = await fetch(`/api/search?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Search failed");
+      let filtered = data.results || [];
+      if (gender) filtered = filtered.filter(d => d.gender === gender);
+      if (sort === "name") filtered.sort((a, b) => a.name.localeCompare(b.name));
+      if (sort === "city") filtered.sort((a, b) => a.city.localeCompare(b.city));
+      setResults(filtered);
+    } catch (e) {
+      setError(e.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [query, neighborhood, specialty, gender, sort]);
+
+  useEffect(() => { fetchDoctors(); }, []);
+
+  const totalPages = Math.ceil(results.length / perPage);
+  const pageData = results.slice((page - 1) * perPage, page * perPage);
+  const activeFilterCount = [specialty !== "All Specialties", gender !== "", accepting, telehealth, neighborhood !== "All of San Diego", selectedLangs.length > 0].filter(Boolean).length;
+
+  function clearAll() { setQuery("Primary Care"); setSpecialty("All Specialties"); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
 
   return (
-    <div style={{ fontFamily: "'DM Sans', system-ui, sans-serif", background: C.white, minHeight: "100vh" }}>
-      <Nav isMobile={isMobile} />
+    <div style={{ fontFamily: "system-ui, sans-serif", background: C.bg, minHeight: "100vh" }}>
+      <nav style={{ position: "sticky", top: 0, zIndex: 200, background: "rgba(253,250,245,0.97)", backdropFilter: "blur(12px)", borderBottom: `1px solid rgba(26,107,138,0.12)`, padding: isMobile ? "0.75rem 1rem" : "0.8rem 1.2rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: isMobile ? "0.6rem" : 0 }}>
+          <div onClick={() => navigate("/")} style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 17 : 19, color: C.ocean, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Your Doctor <span style={{ color: C.dusk }}>SD</span></div>
+          {!isMobile && <>
+            <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && fetchDoctors()} placeholder="Search by specialty or doctor name…" style={{ flex: 1, padding: "0.5rem 0.9rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, outline: "none", background: "white" }} />
+            <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} style={{ padding: "0.5rem 0.8rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "white", outline: "none", appearance: "none" }}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
+            <button onClick={fetchDoctors} style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, color: "white", border: "none", padding: "0.5rem 1.2rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🔍 Search</button>
+          </>}
+        </div>
+        {isMobile && (
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && fetchDoctors()} placeholder="Specialty or doctor name…" style={{ flex: 1, padding: "0.55rem 0.9rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 14, outline: "none", background: "white" }} />
+            <button onClick={fetchDoctors} style={{ background: C.ocean, color: "white", border: "none", padding: "0.55rem 0.9rem", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🔍</button>
+            <button onClick={() => setShowFilters(true)} style={{ background: activeFilterCount > 0 ? C.ocean : "white", color: activeFilterCount > 0 ? "white" : C.ocean, border: `1.5px solid ${activeFilterCount > 0 ? C.ocean : C.border}`, padding: "0.55rem 0.9rem", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+              ⚙️{activeFilterCount > 0 && <span style={{ background: C.dusk, color: "white", borderRadius: "50%", width: 18, height: 18, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>{activeFilterCount}</span>}
+            </button>
+          </div>
+        )}
+      </nav>
 
-      {/* HERO */}
-      <section style={{
-        minHeight: "calc(100vh - 56px)", display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        padding: isMobile ? "3rem 1.2rem 5rem" : "6rem 2rem 4rem",
-        position: "relative", overflow: "hidden", textAlign: "center",
-        background: "linear-gradient(175deg, #e8f6f9 0%, #fdfaf5 50%, #fef3e2 100%)",
-      }}>
-        {/* Orbs */}
-        {[
-          { w: 300, h: 300, bg: C.sky, top: "5%", left: "-8%", delay: "0s" },
-          { w: 200, h: 200, bg: "#a8d8bc", top: "15%", right: "-5%", delay: "-3s" },
-          { w: 180, h: 180, bg: C.sand, bottom: "15%", left: "30%", delay: "-5s" },
-        ].map((o, i) => (
-          <div key={i} style={{
-            position: "absolute", borderRadius: "50%", filter: "blur(55px)", opacity: 0.3,
-            width: o.w, height: o.h, background: o.bg,
-            top: o.top, left: o.left, right: o.right, bottom: o.bottom,
-            animation: `drift 8s ease-in-out ${o.delay} infinite`,
-          }} />
-        ))}
+      {isMobile && showFilters && <>
+        <div onClick={() => setShowFilters(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 300 }} />
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 400, background: "white", borderRadius: "20px 20px 0 0", padding: "1.5rem 1.2rem 2rem", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 -8px 30px rgba(0,0,0,0.15)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.2rem" }}>
+            <div style={{ fontWeight: 700, fontSize: 17, color: C.deep }}>Filter Doctors</div>
+            <button onClick={() => setShowFilters(false)} style={{ background: "#f0f4f5", border: "none", borderRadius: "50%", width: 32, height: 32, fontSize: 16, cursor: "pointer" }}>✕</button>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Neighborhood</div>
+            <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} style={{ width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" }}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
+          </div>
+          <FilterPanel specialty={specialty} setSpecialty={setSpecialty} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} isMobile />
+        </div>
+      </>}
 
-        <style>{`
-          @keyframes drift { 0%,100%{transform:translate(0,0)} 50%{transform:translate(12px,-18px)} }
-          @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
-        `}</style>
-
-        <div style={{ position: "relative", zIndex: 2, maxWidth: 700, width: "100%" }}>
-          {/* Badge */}
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(26,107,138,0.08)", border: "1px solid rgba(26,107,138,0.2)", color: C.ocean, fontSize: 12, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", padding: "0.4rem 1rem", borderRadius: 20, marginBottom: isMobile ? "1rem" : "1.6rem", animation: "fadeUp 0.6s ease both" }}>
-            <span style={{ width: 7, height: 7, background: C.dusk, borderRadius: "50%", display: "inline-block" }} />
-            San Diego's Free Doctor Finder
+      <div style={{ maxWidth: 1050, margin: "0 auto", padding: isMobile ? "1rem" : "1.2rem 1.2rem 3rem", display: "flex", gap: "1.2rem", alignItems: "flex-start" }}>
+        {!isMobile && (
+          <aside style={{ width: 200, flexShrink: 0 }}>
+            <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "1.1rem", position: "sticky", top: 72 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 14 }}>Filters</div>
+              <FilterPanel specialty={specialty} setSpecialty={setSpecialty} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={clearAll} onSearch={fetchDoctors} isMobile={false} />
+              <button onClick={fetchDoctors} style={{ width: "100%", marginTop: 10, background: C.ocean, color: "white", border: "none", padding: "0.6rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Apply Filters</button>
+            </div>
+          </aside>
+        )}
+        <main style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ fontSize: 13, color: C.muted }}>
+              {loading ? "Searching NPI registry…" : error ? "" : results.length > 0
+                ? <span>Showing <strong style={{ color: C.deep }}>{(page-1)*perPage+1}–{Math.min(page*perPage,results.length)}</strong> of <strong style={{ color: C.deep }}>{results.length}</strong> licensed San Diego providers</span>
+                : "No providers found — try a different specialty"}
+            </div>
+            <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }} style={{ padding: "0.4rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 7, fontFamily: "inherit", fontSize: 12, background: "white", outline: "none", appearance: "none" }}>
+              <option value="name">Sort: Name A–Z</option>
+              <option value="city">Sort: City</option>
+            </select>
           </div>
 
-          {/* Desktop heading */}
-          {!isMobile && (
-            <>
-              <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(2.6rem,5.5vw,4.4rem)", lineHeight: 1.1, color: C.deep, marginBottom: "1.2rem", animation: "fadeUp 0.6s 0.1s ease both" }}>
-                Find <em>your</em> doctor<br />right here in <span style={{ color: C.dusk }}>San Diego.</span>
-              </h1>
-              <p style={{ fontSize: "1.05rem", fontWeight: 300, color: C.muted, lineHeight: 1.75, maxWidth: 500, margin: "0 auto 2.4rem", animation: "fadeUp 0.6s 0.2s ease both" }}>
-                No paywalls. No paid rankings. Just every doctor in San Diego — searchable by specialty, insurance, language, and more.
-              </p>
-            </>
-          )}
-
-          {/* Mobile carousel */}
-          {isMobile && (
-            <div
-              onTouchStart={e => setTouchStart(e.touches[0].clientX)}
-              onTouchEnd={e => {
-                const diff = touchStart - e.changedTouches[0].clientX;
-                if (Math.abs(diff) > 40) setSlide(s => (s + (diff > 0 ? 1 : -1) + SLIDES.length) % SLIDES.length);
-              }}
-              style={{ marginBottom: "1.4rem" }}
-            >
-              <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "2rem", lineHeight: 1.2, color: C.deep, marginBottom: "0.8rem" }}>
-                {SLIDES[slide].heading}
-              </h1>
-              <p style={{ fontSize: "0.95rem", fontWeight: 300, color: C.muted, lineHeight: 1.7 }}>{SLIDES[slide].sub}</p>
-              <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: "0.9rem" }}>
-                {SLIDES.map((_, i) => (
-                  <div key={i} onClick={() => setSlide(i)} style={{ width: 7, height: 7, borderRadius: "50%", background: i === slide ? C.ocean : "rgba(26,107,138,0.2)", cursor: "pointer", transition: "background 0.2s" }} />
-                ))}
-              </div>
+          {loading && <Spinner />}
+          {error && (
+            <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 14, padding: "3rem 2rem", textAlign: "center" }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>⚠️</div>
+              <div style={{ fontWeight: 700, color: C.deep, marginBottom: 6 }}>Search failed</div>
+              <div style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>{error}</div>
+              <button onClick={fetchDoctors} style={{ background: C.ocean, color: "white", border: "none", padding: "0.6rem 1.4rem", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Try Again</button>
             </div>
           )}
-
-          {/* Search card */}
-          <div style={{ background: "white", borderRadius: "1.1rem", padding: isMobile ? "1.1rem" : "1.5rem", boxShadow: "0 8px 36px rgba(13,61,82,0.11)", animation: "fadeUp 0.6s 0.3s ease both", textAlign: "left" }}>
-            <div style={{ display: "flex", gap: "0.7rem", flexWrap: "wrap" }}>
-              <div style={{ flex: 2, minWidth: 140, display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted }}>Specialty or Doctor</label>
-                <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSearch()}
-                  placeholder="e.g. Primary Care, Dr. Smith…"
-                  style={{ padding: "0.7rem 1rem", border: `1.5px solid ${C.border}`, borderRadius: "0.65rem", fontFamily: "inherit", fontSize: 14, outline: "none", background: "#f8fbfc" }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 130, display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted }}>Neighborhood</label>
-                <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)}
-                  style={{ padding: "0.7rem 0.9rem", border: `1.5px solid ${C.border}`, borderRadius: "0.65rem", fontFamily: "inherit", fontSize: 14, outline: "none", appearance: "none", background: "#f8fbfc" }}>
-                  <option value="">All of San Diego</option>
-                  {["La Jolla","Chula Vista","Encinitas","Oceanside","El Cajon","Escondido","National City","Santee","Poway"].map(n => <option key={n}>{n}</option>)}
-                </select>
-              </div>
-              <button onClick={handleSearch} style={{ alignSelf: "flex-end", background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, color: "white", border: "none", padding: "0.75rem 1.6rem", borderRadius: "0.65rem", fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                🔍 Find Doctors
-              </button>
+          {!loading && !error && results.length === 0 && (
+            <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 14, padding: "3rem 2rem", textAlign: "center" }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🔍</div>
+              <div style={{ fontWeight: 700, color: C.deep, marginBottom: 6 }}>No doctors found</div>
+              <div style={{ fontSize: 13, color: C.muted }}>Try a different specialty or neighborhood.</div>
+              <button onClick={clearAll} style={{ marginTop: 14, background: C.ocean, color: "white", border: "none", padding: "0.6rem 1.4rem", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Clear Filters</button>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: "0.8rem" }}>
-              <span style={{ fontSize: 12, color: C.muted }}>Popular:</span>
-              {["Primary Care","Pediatrics","Spanish-speaking","Accepting Patients","Telehealth"].map(tag => (
-                <button key={tag} onClick={() => { setQuery(tag); handleSearch(); }}
-                  style={{ fontSize: 12, padding: "3px 10px", borderRadius: 20, background: "rgba(26,107,138,0.07)", color: C.ocean, border: "1px solid rgba(26,107,138,0.15)", cursor: "pointer", fontFamily: "inherit" }}>
-                  {tag}
-                </button>
+          )}
+          {!loading && !error && pageData.map((doc, i) => <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} />)}
+          {totalPages > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 20, flexWrap: "wrap" }}>
+              <button onClick={() => { setPage(p => Math.max(1,p-1)); window.scrollTo(0,0); }} disabled={page===1} style={{ padding: "7px 14px", border: `1.5px solid ${C.border}`, borderRadius: 8, background: "white", cursor: page===1?"default":"pointer", opacity: page===1?0.4:1, fontSize: 13 }}>← Prev</button>
+              {Array.from({length:totalPages},(_,i)=>i+1).map(p=>(
+                <button key={p} onClick={() => { setPage(p); window.scrollTo(0,0); }} style={{ padding: "7px 13px", border: `1.5px solid ${p===page?C.ocean:C.border}`, borderRadius: 8, background: p===page?C.ocean:"white", color: p===page?"white":C.text, cursor: "pointer", fontSize: 13, fontWeight: p===page?600:400 }}>{p}</button>
               ))}
+              <button onClick={() => { setPage(p => Math.min(totalPages,p+1)); window.scrollTo(0,0); }} disabled={page===totalPages} style={{ padding: "7px 14px", border: `1.5px solid ${C.border}`, borderRadius: 8, background: "white", cursor: page===totalPages?"default":"pointer", opacity: page===totalPages?0.4:1, fontSize: 13 }}>Next →</button>
             </div>
-          </div>
-        </div>
-
-        {/* Wave */}
-        <svg style={{ position: "absolute", bottom: -2, left: 0, right: 0, width: "100%" }} viewBox="0 0 1440 70" preserveAspectRatio="none">
-          <path d="M0,35 C360,70 1080,0 1440,35 L1440,70 L0,70 Z" fill={C.deep} />
-        </svg>
-      </section>
-
-      {/* TRUST BAR */}
-      <div style={{ background: C.deep, color: "rgba(255,255,255,0.75)", display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "2rem", padding: "1.2rem 2rem" }}>
-        {[["🏥","40,000+","San Diego Providers"],["💳","50+","Insurance Plans"],["🌎","30+","Languages Spoken"],["✅","Always","Free for Patients"]].map(([icon, strong, label]) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 14 }}>
-            <span>{icon}</span><strong style={{ color: "white" }}>{strong}</strong>&nbsp;{label}
-          </div>
-        ))}
+          )}
+          {!loading && results.length > 0 && (
+            <div style={{ fontSize: 11, color: "#9ab5bf", textAlign: "center", marginTop: 16 }}>Data sourced live from the National Provider Index (NPPES). NPI does not confirm licensure.</div>
+          )}
+        </main>
       </div>
-
-      {/* HOW IT WORKS */}
-      <section style={{ maxWidth: 1050, margin: "0 auto", padding: "4.5rem 1.5rem" }}>
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: C.dusk, marginBottom: 6 }}>Simple by design</div>
-        <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(1.8rem,3.5vw,2.6rem)", color: C.deep, marginBottom: "0.9rem" }}>Finding care shouldn't be hard.</h2>
-        <p style={{ color: C.muted, fontSize: 15, fontWeight: 300, maxWidth: 460, lineHeight: 1.75, marginBottom: "2.5rem" }}>A no-nonsense tool for San Diego residents — search, filter, and connect with the right doctor in minutes.</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: "1.2rem" }}>
-          {[
-            { n: "01", icon: "🔍", title: "Search your needs", body: "Specialty, condition, or name. Filter by neighborhood, insurance, language, or availability." },
-            { n: "02", icon: "📋", title: "Browse real listings", body: "Every licensed provider in San Diego County — not just the ones who paid to be here." },
-            { n: "03", icon: "📞", title: "Connect directly", body: "Call, book, or visit the practice directly. No middleman, no upsells." },
-            { n: "04", icon: "⭐", title: "Help the community", body: "Leave a quick update — are they accepting new patients? Neighbors help neighbors." },
-          ].map(({ n, icon, title, body }) => (
-            <div key={n} style={{ background: "white", borderRadius: 12, padding: "1.6rem", border: `1.5px solid ${C.border}` }}>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "2.6rem", color: "rgba(26,107,138,0.1)", fontWeight: 700, lineHeight: 1 }}>{n}</div>
-              <div style={{ fontSize: "1.6rem", margin: "0.6rem 0" }}>{icon}</div>
-              <div style={{ fontWeight: 600, color: C.deep, marginBottom: 6 }}>{title}</div>
-              <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.65 }}>{body}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* SPECIALTIES */}
-      <div style={{ background: "linear-gradient(135deg,#f0f9fb,#fdfaf5)", padding: "4rem 1.5rem" }}>
-        <div style={{ maxWidth: 1050, margin: "0 auto" }}>
-          <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: C.dusk, marginBottom: 6 }}>Browse by specialty</div>
-          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(1.6rem,3vw,2.4rem)", color: C.deep, marginBottom: "2rem" }}>What kind of care are you looking for?</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: "0.9rem" }}>
-            {[["🩺","Primary Care"],["👶","Pediatrics"],["🦷","Dentistry"],["👁️","Optometry"],["🧠","Mental Health"],["❤️","Cardiology"],["🦴","Orthopedics"],["🤰","OB-GYN"],["🧪","Dermatology"],["💊","Oncology"],["🫁","Pulmonology"],["➕","View All"]].map(([icon, label]) => (
-              <div key={label} onClick={() => navigate(`/search?q=${label}`)}
-                style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: "0.85rem", padding: "1.1rem 0.8rem", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer", textAlign: "center", transition: "border-color 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = C.sky}
-                onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
-              >
-                <span style={{ fontSize: "1.7rem" }}>{icon}</span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: C.deep }}>{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* PROVIDER CALLOUT */}
-      <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, color: "white", padding: "3.5rem 1.5rem", textAlign: "center" }}>
-        <div style={{ maxWidth: 560, margin: "0 auto" }}>
-          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(1.6rem,3vw,2.2rem)", marginBottom: "0.9rem" }}>Are you a San Diego provider?</h2>
-          <p style={{ fontSize: 15, fontWeight: 300, opacity: 0.85, lineHeight: 1.75, marginBottom: "1.8rem" }}>Claim your free listing and make sure patients can find you. No fees. No ranking games.</p>
-          <button onClick={() => navigate("/claim")} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: C.dusk, color: "white", border: "none", padding: "0.85rem 2rem", borderRadius: 25, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
-            🏥 Claim Your Free Listing
-          </button>
-        </div>
-      </div>
-
-      {/* FOOTER */}
-      <footer style={{ background: C.deep, color: "rgba(255,255,255,0.5)", padding: "2rem 1.5rem", textAlign: "center", fontSize: 13, lineHeight: 1.9 }}>
-        <div>Made with ♥ for San Diego &nbsp;|&nbsp; <strong style={{ color: "rgba(255,255,255,0.8)" }}>Your Doctor SD</strong></div>
-        <div style={{ marginTop: 4 }}>
-          {["About","Privacy","Contact","For Providers"].map((l, i) => (
-            <span key={l}><span style={{ color: C.sky, cursor: "pointer" }}>{l}</span>{i < 3 ? " · " : ""}</span>
-          ))}
-        </div>
-        <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55 }}>Provider data sourced from the National Provider Index (NPI) and CMS public datasets. Always verify insurance directly with your provider.</div>
-      </footer>
     </div>
   );
 }
