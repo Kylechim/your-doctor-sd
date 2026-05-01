@@ -1,10 +1,8 @@
 name: Monthly NPI Data Import
 
 on:
-  # Run on the 1st of every month at 3am UTC
   schedule:
     - cron: '0 3 1 * *'
-  # Also allow manual runs from GitHub Actions tab
   workflow_dispatch:
 
 jobs:
@@ -28,7 +26,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: node scripts/import-npi.js
+        run: node --input-type=module < scripts/import-npi.js
 
       - name: Report success
         if: success()
