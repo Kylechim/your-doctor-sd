@@ -299,31 +299,37 @@ async function getNPIDownloadUrl() {
     console.log('Could not scrape CMS page, using direct URL...');
   }
 
-  // Fallback: try current month first, then previous month
+  // Fallback: try multiple URL formats for current and previous month
   const now = new Date();
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  
-  // Try current month
-  const currentMonth = months[now.getMonth()];
-  const currentYear = now.getFullYear();
-  const currentUrl = `https://download.cms.gov/nppes/NPPES_Data_Dissemination_${currentMonth}_${currentYear}.zip`;
-  
-  try {
-    const testRes = await fetch(currentUrl, { method: 'HEAD' });
-    if (testRes.ok) {
-      console.log(`✅ Using current month URL: ${currentUrl}`);
-      return currentUrl;
-    }
-  } catch(e) {}
 
-  // Try previous month
-  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevMonth = months[prevDate.getMonth()];
-  const prevYear = prevDate.getFullYear();
-  const prevUrl = `https://download.cms.gov/nppes/NPPES_Data_Dissemination_${prevMonth}_${prevYear}.zip`;
-  
-  console.log(`✅ Using previous month URL: ${prevUrl}`);
-  return prevUrl;
+  const dates = [
+    { month: months[now.getMonth()], year: now.getFullYear() },
+    { month: months[new Date(now.getFullYear(), now.getMonth()-1, 1).getMonth()], year: new Date(now.getFullYear(), now.getMonth()-1, 1).getFullYear() },
+  ];
+
+  const suffixes = ['_V2', '_V1', ''];
+
+  for (const { month, year } of dates) {
+    for (const suffix of suffixes) {
+      const url = `https://download.cms.gov/nppes/NPPES_Data_Dissemination_${month}_${year}${suffix}.zip`;
+      try {
+        const testRes = await fetch(url, { method: 'HEAD' });
+        if (testRes.ok) {
+          console.log(`✅ Found working URL: ${url}`);
+          return url;
+        }
+        console.log(`  ✗ Not found: ${url}`);
+      } catch(e) {
+        console.log(`  ✗ Error checking: ${url}`);
+      }
+    }
+  }
+
+  // Last resort - use the known working URL
+  const fallback = 'https://download.cms.gov/nppes/NPPES_Data_Dissemination_April_2026_V2.zip';
+  console.log(`⚠️ Using hardcoded fallback: ${fallback}`);
+  return fallback;
 }
 
 async function downloadFile(url, destPath) {
