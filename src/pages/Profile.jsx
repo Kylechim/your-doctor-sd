@@ -205,9 +205,11 @@ export default function Profile() {
               {doc.phone && doc.phone !== "Call for number" && (
                 <a href={`tel:${doc.phone}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: C.dusk, color: "white", textDecoration: "none", padding: "0.7rem 1.4rem", borderRadius: 10, fontWeight: 600, fontSize: 14 }}>📞 {doc.phone}</a>
               )}
-              <button style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "1.5px solid rgba(255,255,255,0.3)", padding: "0.65rem 1.4rem", borderRadius: 10, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>
-                📅 Request Appointment
-              </button>
+              {!isVerified && (
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", textAlign: "center", fontStyle: "italic" }}>
+                  Provider: <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => navigate("/claim")}>add your booking link →</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -218,7 +220,7 @@ export default function Profile() {
             {doc.phone && doc.phone !== "Call for number" && (
               <a href={`tel:${doc.phone}`} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: C.dusk, color: "white", textDecoration: "none", padding: "0.7rem", borderRadius: 10, fontWeight: 600, fontSize: 14 }}>📞 Call</a>
             )}
-            <button style={{ flex: 1, background: "rgba(255,255,255,0.15)", color: "white", border: "1.5px solid rgba(255,255,255,0.3)", padding: "0.7rem", borderRadius: 10, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>📅 Appointment</button>
+
           </div>
         )}
       </div>
