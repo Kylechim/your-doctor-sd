@@ -299,14 +299,31 @@ async function getNPIDownloadUrl() {
     console.log('Could not scrape CMS page, using direct URL...');
   }
 
-  // Fallback: build URL from current date (CMS uses format: NPPES_Data_Dissemination_MonthYYYY)
+  // Fallback: try current month first, then previous month
   const now = new Date();
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const month = months[now.getMonth()];
-  const year = now.getFullYear();
-  const url = `https://download.cms.gov/nppes/NPPES_Data_Dissemination_${month}_${year}.zip`;
-  console.log(`✅ Using direct URL: ${url}`);
-  return url;
+  
+  // Try current month
+  const currentMonth = months[now.getMonth()];
+  const currentYear = now.getFullYear();
+  const currentUrl = `https://download.cms.gov/nppes/NPPES_Data_Dissemination_${currentMonth}_${currentYear}.zip`;
+  
+  try {
+    const testRes = await fetch(currentUrl, { method: 'HEAD' });
+    if (testRes.ok) {
+      console.log(`✅ Using current month URL: ${currentUrl}`);
+      return currentUrl;
+    }
+  } catch(e) {}
+
+  // Try previous month
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonth = months[prevDate.getMonth()];
+  const prevYear = prevDate.getFullYear();
+  const prevUrl = `https://download.cms.gov/nppes/NPPES_Data_Dissemination_${prevMonth}_${prevYear}.zip`;
+  
+  console.log(`✅ Using previous month URL: ${prevUrl}`);
+  return prevUrl;
 }
 
 async function downloadFile(url, destPath) {
