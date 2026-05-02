@@ -21,23 +21,18 @@ export default function Nav({ isMobile }) {
       </div>
 
       {!isMobile && (
-        <div style={{ display: "flex", gap: "1.5rem", marginLeft: "auto" }}>
-          {[
-            { label: "Search", path: "/search" },
-            { label: "For Providers", path: "/claim" },
-          ].map(({ label, path }) => (
-            <button key={path} onClick={() => navigate(path)} style={{
-              background: "transparent", border: "none",
-              color: location.pathname === path ? C.ocean : C.muted,
-              fontFamily: "inherit", fontSize: 14, fontWeight: location.pathname === path ? 600 : 400,
-              cursor: "pointer", padding: 0,
-            }}>{label}</button>
-          ))}
+        <div style={{ display: "flex", gap: "1.5rem", marginLeft: "auto", alignItems: "center" }}>
+          <button onClick={() => navigate("/search")} style={{
+            background: "transparent", border: "none",
+            color: location.pathname === "/search" ? C.ocean : C.muted,
+            fontFamily: "inherit", fontSize: 14, fontWeight: location.pathname === "/search" ? 600 : 400,
+            cursor: "pointer", padding: 0,
+          }}>Search</button>
           <button onClick={() => navigate("/claim")} style={{
             background: C.ocean, color: "white", border: "none",
             padding: "0.45rem 1.1rem", borderRadius: 20,
             fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer",
-          }}>List Your Practice</button>
+          }}>For Providers</button>
         </div>
       )}
 
