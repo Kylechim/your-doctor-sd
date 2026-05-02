@@ -273,22 +273,27 @@ async function getNPIDownloadUrl() {
     });
     const html = await res.text();
 
-    // Try multiple patterns to find the download link
-    const patterns = [
-      /href="(https?:\/\/download\.cms\.gov\/nppes\/NPPES_Data_Dissemination_[^"]+\.zip)"/,
-      /href="(\/nppes\/NPPES_Data_Dissemination_[^"]+\.zip)"/,
-      /(NPPES_Data_Dissemination_[A-Za-z0-9_]+\.zip)/,
-    ];
+    // Find ALL zip file links
+    const allMatches = [...html.matchAll(/href="([^"]*NPPES_Data_Dissemination[^"]*\.zip)"/g)];
+    console.log('Found zip files:', allMatches.map(m => m[1]));
 
-    for (const pattern of patterns) {
-      const match = html.match(pattern);
-      if (match) {
-        let url = match[1];
-        if (url.startsWith('/')) url = 'https://download.cms.gov' + url;
-        if (!url.startsWith('http')) url = 'https://download.cms.gov/nppes/' + url;
-        console.log(`✅ Found NPI file: ${url}`);
-        return url;
-      }
+    // Prefer the full replacement file (not pfile which is partial)
+    for (const match of allMatches) {
+      let url = match[1];
+      if (url.startsWith('/')) url = 'https://download.cms.gov' + url;
+      if (!url.startsWith('http')) url = 'https://download.cms.gov/nppes/' + url;
+      // Skip partial update files
+      if (url.toLowerCase().includes('pfile') || url.toLowerCase().includes('update')) continue;
+      console.log(`✅ Found full NPI file: ${url}`);
+      return url;
+    }
+
+    // If only partial file found, use it anyway
+    if (allMatches.length > 0) {
+      let url = allMatches[0][1];
+      if (url.startsWith('/')) url = 'https://download.cms.gov' + url;
+      console.log(`⚠️ Only found partial file: ${url}`);
+      return url;
     }
   } catch (e) {
     console.log('Could not scrape CMS page, using direct URL...');
@@ -341,7 +346,9 @@ async function importProviders(zipPath) {
 
   // Open the zip and find the CSV file inside
   const directory = await unzipper.Open.file(zipPath);
-  const csvFile = directory.files.find(f => f.path.endsWith('.csv') && f.path.includes('npidata'));
+  // Prefer full data file over partial update file
+  let csvFile = directory.files.find(f => f.path.endsWith('.csv') && f.path.includes('npidata') && !f.path.includes('pfile'));
+  if (!csvFile) csvFile = directory.files.find(f => f.path.endsWith('.csv') && f.path.includes('npidata'));
 
   if (!csvFile) {
     throw new Error('Could not find NPI CSV file inside zip. Files found: ' + directory.files.map(f => f.path).join(', '));
@@ -356,15 +363,7 @@ async function importProviders(zipPath) {
       relax_column_count: true,
     });
 
-    let headersLogged = false;
     parser.on('data', async (row) => {
-      if (!headersLogged) {
-        const allKeys = Object.keys(row);
-        console.log('All CSV columns:', JSON.stringify(allKeys.slice(0, 30)));
-        const providerKeys = allKeys.filter(k => k.toLowerCase().includes('provider'));
-        console.log('Provider columns:', JSON.stringify(providerKeys.slice(0, 20)));
-        headersLogged = true;
-      }
       processed++;
       if (processed % 500000 === 0) console.log(`  ... processed ${processed.toLocaleString()} rows`);
 
