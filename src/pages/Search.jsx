@@ -180,7 +180,7 @@ function DoctorCard({ doc, isMobile }) {
   );
 }
 
-function FilterPanel({ specialtySearch, setSpecialtySearch, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
+function FilterPanel({ specialtySearch, setSpecialtySearch, neighborhood, setNeighborhood, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
   const sel = { width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -193,6 +193,10 @@ function FilterPanel({ specialtySearch, setSpecialtySearch, gender, setGender, a
           supabaseUrl={SUPABASE_URL}
           supabaseKey={SUPABASE_ANON_KEY}
         />
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Neighborhood</div>
+        <select value={neighborhood} onChange={e => { setNeighborhood(e.target.value); }} style={sel}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
       </div>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Gender</div>
@@ -282,13 +286,10 @@ export default function Search() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: isMobile ? "0.6rem" : 0 }}>
           <div onClick={() => navigate("/")} style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 17 : 19, color: C.ocean, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Your Doctor <span style={{ color: C.dusk }}>SD</span></div>
           {!isMobile && (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
               <span style={{ fontSize: 15, color: C.muted, fontStyle: "italic", letterSpacing: "0.01em" }}>
                 Finding care, made simple.
               </span>
-              <select value={neighborhood} onChange={e => { setNeighborhood(e.target.value); setPage(1); }} style={{ padding: "0.5rem 0.8rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "white", outline: "none", appearance: "none" }}>
-                {NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}
-              </select>
             </div>
           )}
         </div>
@@ -310,11 +311,8 @@ export default function Search() {
             <div style={{ fontWeight: 700, fontSize: 17, color: C.deep }}>Filter Doctors</div>
             <button onClick={() => setShowFilters(false)} style={{ background: "#f0f4f5", border: "none", borderRadius: "50%", width: 32, height: 32, fontSize: 16, cursor: "pointer" }}>✕</button>
           </div>
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Neighborhood</div>
-            <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} style={{ width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" }}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
-          </div>
-          <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} isMobile />
+
+          <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} neighborhood={neighborhood} setNeighborhood={n => { setNeighborhood(n); setPage(1); }} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} isMobile />
         </div>
       </>}
 
@@ -323,7 +321,7 @@ export default function Search() {
           <aside style={{ width: 200, flexShrink: 0 }}>
             <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "1.1rem", position: "sticky", top: 72 }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 14 }}>Filters</div>
-              <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={clearAll} onSearch={fetchDoctors} isMobile={false} />
+              <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} neighborhood={neighborhood} setNeighborhood={n => { setNeighborhood(n); setPage(1); }} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={clearAll} onSearch={fetchDoctors} isMobile={false} />
               <button onClick={fetchDoctors} style={{ width: "100%", marginTop: 10, background: C.ocean, color: "white", border: "none", padding: "0.6rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Apply Filters</button>
             </div>
           </aside>
