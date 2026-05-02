@@ -386,7 +386,24 @@ async function importProviders(zipPath) {
       relax_column_count: true,
     });
 
+    let firstRowLogged = false;
     parser.on('data', async (row) => {
+      if (!firstRowLogged) {
+        // Log all keys to find gender column
+        const keys = Object.keys(row);
+        const genderLike = keys.filter(k => 
+          k.toLowerCase().includes('sex') || 
+          k.toLowerCase().includes('gender') ||
+          k.toLowerCase().includes('male') ||
+          k.toLowerCase().includes('female')
+        );
+        console.log('Total columns:', keys.length);
+        console.log('Gender-like columns:', JSON.stringify(genderLike));
+        // Also log columns 10-20 which is where gender usually appears
+        console.log('Columns 8-15:', JSON.stringify(keys.slice(8,15)));
+        console.log('Sample values 8-15:', JSON.stringify(keys.slice(8,15).map(k => `${k}=${row[k]}`)));
+        firstRowLogged = true;
+      }
       processed++;
       if (processed % 500000 === 0) console.log(`  ... processed ${processed.toLocaleString()} rows`);
 
