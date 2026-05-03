@@ -483,7 +483,7 @@ export default function ClaimListing() {
         borderBottom: `1px solid rgba(26,107,138,0.12)`,
         padding: "0.8rem 1.2rem", display: "flex", alignItems: "center", gap: "1rem",
       }}>
-        <div style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 16 : 18, color: C.ocean, fontWeight: 700 }}>
+        <div onClick={() => window.location.href = "/"} style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 16 : 18, color: C.ocean, fontWeight: 700, cursor: "pointer" }}>
           Your Doctor <span style={{ color: C.dusk }}>SD</span>
         </div>
         {!submitted && (
