@@ -35,12 +35,6 @@ export default function Nav({ isMobile }) {
             cursor: "pointer", padding: 0,
           }}>About</button>
           <button onClick={() => navigate("/pricing")} style={{
-            background: "transparent", border: "none",
-            color: location.pathname === "/pricing" ? C.ocean : C.muted,
-            fontFamily: "inherit", fontSize: 14, fontWeight: location.pathname === "/pricing" ? 600 : 400,
-            cursor: "pointer", padding: 0,
-          }}>Pricing</button>
-          <button onClick={() => navigate("/claim")} style={{
             background: C.ocean, color: "white", border: "none",
             padding: "0.45rem 1.1rem", borderRadius: 20,
             fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer",
