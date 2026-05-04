@@ -4,6 +4,7 @@ import Search from "./pages/Search";
 import Profile from "./pages/Profile";
 import Claim from "./pages/Claim";
 import About from "./pages/About";
+import Pricing from "./pages/Pricing";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
         <Route path="/doctor/:id" element={<Profile />} />
         <Route path="/claim" element={<Claim />} />
         <Route path="/about" element={<About />} />
+        <Route path="/pricing" element={<Pricing />} />
       </Routes>
     </BrowserRouter>
   );
