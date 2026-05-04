@@ -207,9 +207,9 @@ export default function Home() {
       <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, color: "white", padding: "3.5rem 1.5rem", textAlign: "center" }}>
         <div style={{ maxWidth: 560, margin: "0 auto" }}>
           <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(1.6rem,3vw,2.2rem)", marginBottom: "0.9rem" }}>Are you a San Diego provider?</h2>
-          <p style={{ fontSize: 15, fontWeight: 300, opacity: 0.85, lineHeight: 1.75, marginBottom: "1.8rem" }}>Claim your free listing and make sure patients can find you. No fees. No ranking games.</p>
+          <p style={{ fontSize: 15, fontWeight: 300, opacity: 0.85, lineHeight: 1.75, marginBottom: "1.8rem" }}>Claim your listing and make sure patients can find you. No fees. No ranking games.</p>
           <button onClick={() => navigate("/claim")} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: C.dusk, color: "white", border: "none", padding: "0.85rem 2rem", borderRadius: 25, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
-            🏥 Claim Your Free Listing
+            🏥 Claim Your Listing
           </button>
         </div>
       </div>
