@@ -107,7 +107,7 @@ export default function About() {
             Provider information comes from the <strong style={{ color: C.text }}>National Provider Index (NPI)</strong> — a free, public federal database of every licensed healthcare provider in the United States. We download this data monthly and filter it to San Diego county, so you're always seeing current, government-verified provider information.
           </p>
           <p style={{ fontSize: 15, lineHeight: 1.8, color: C.muted }}>
-            Information like insurance acceptance, telehealth availability, office hours, and languages spoken comes directly from providers who have <strong style={{ color: C.text }}>claimed their free listing</strong>. If a provider hasn't claimed their listing yet, we show those fields as "not yet reported" rather than guess.
+            Information like insurance acceptance, telehealth availability, office hours, and languages spoken comes directly from providers who have <strong style={{ color: C.text }}>claimed their listing</strong>. If a provider hasn't claimed their listing yet, we show those fields as "not yet reported" rather than guess.
           </p>
         </div>
 
