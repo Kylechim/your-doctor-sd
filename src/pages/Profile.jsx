@@ -36,7 +36,7 @@ function ClaimNudge({ navigate }) {
     <div style={{ background: "rgba(26,107,138,0.04)", border: `1.5px dashed rgba(26,107,138,0.25)`, borderRadius: 10, padding: "1.2rem 1.4rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
       <div>
         <div style={{ fontWeight: 600, color: C.deep, fontSize: 14, marginBottom: 3 }}>Is this your practice?</div>
-        <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>Claim your free listing to add insurance, hours, telehealth availability and more.</div>
+        <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>Claim your listing to add insurance, hours, telehealth availability and more.</div>
       </div>
       <button onClick={() => navigate("/claim")} style={{ background: C.ocean, color: "white", border: "none", padding: "0.6rem 1.3rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
         Claim Free Listing →
