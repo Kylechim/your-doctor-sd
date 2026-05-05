@@ -154,14 +154,11 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
 }
 
 // ── SEARCH MAP ──────────────────────────────────────────────────────────────
-// Geocodes all doctors first, then places all markers at once.
-// This means fitBounds fires exactly once and never races with pin clicks.
 function SearchMap({ doctors, highlightedNpi, onPinClick }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
-  const geocodedRef = useRef(false); // true once initial fitBounds has fired
 
   // Init map once
   useEffect(() => {
@@ -177,7 +174,6 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
       mapInstanceRef.current = map;
       infoWindowRef.current = new window.google.maps.InfoWindow();
     }
-
     if (window.google?.maps) {
       initMap();
     } else {
@@ -191,25 +187,23 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
     }
   }, []);
 
-  // When doctors change: geocode all, then place all markers, then fitBounds once
+  // Geocode ALL doctors first, then place all markers, then fitBounds ONCE with no idle listener
   useEffect(() => {
     if (!mapInstanceRef.current || !window.google?.maps || !doctors.length) return;
 
-    // Clear old markers
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
-    geocodedRef.current = false;
 
     const geocoder = new window.google.maps.Geocoder();
     const toGeocode = doctors.filter(d => d.address && d.city);
-    const results = new Array(toGeocode.length).fill(null);
+    const geocodeResults = new Array(toGeocode.length).fill(null);
     let completed = 0;
 
     function placeAllMarkers() {
       const bounds = new window.google.maps.LatLngBounds();
-      const validResults = results.filter(Boolean);
+      const valid = geocodeResults.filter(Boolean);
 
-      validResults.forEach(({ doc, position, index }) => {
+      valid.forEach(({ doc, position, index }) => {
         const marker = new window.google.maps.Marker({
           map: mapInstanceRef.current,
           position,
@@ -231,12 +225,8 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
         });
 
         marker._npi = doc.npi;
-        marker._position = position;
 
         marker.addListener("click", () => {
-          // Mark that user has taken control of the map view
-          geocodedRef.current = true;
-
           mapInstanceRef.current.panTo(position);
           mapInstanceRef.current.setZoom(15);
 
@@ -251,7 +241,6 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
             `);
             infoWindowRef.current.open(mapInstanceRef.current, marker);
           }
-
           if (onPinClick) onPinClick(doc.npi);
         });
 
@@ -259,22 +248,17 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
         bounds.extend(position);
       });
 
-      // fitBounds only fires here, after ALL geocoding is done
-      if (validResults.length > 0 && !geocodedRef.current) {
-        mapInstanceRef.current.fitBounds(bounds);
-        mapInstanceRef.current.addListener("idle", function handler() {
-          if (mapInstanceRef.current.getZoom() > 13) mapInstanceRef.current.setZoom(13);
-          window.google.maps.event.removeListener(this);
-        });
-        geocodedRef.current = true; // never fitBounds again until doctors change
+      // fitBounds with padding — no idle listener, no zoom cap
+      if (valid.length > 0) {
+        mapInstanceRef.current.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
       }
     }
 
     toGeocode.forEach((doc, index) => {
       setTimeout(() => {
-        geocoder.geocode({ address: `${doc.address}, ${doc.city}, CA` }, (geoResults, status) => {
-          if (status === "OK" && geoResults[0]) {
-            results[index] = { doc, position: geoResults[0].geometry.location, index };
+        geocoder.geocode({ address: `${doc.address}, ${doc.city}, CA` }, (results, status) => {
+          if (status === "OK" && results[0]) {
+            geocodeResults[index] = { doc, position: results[0].geometry.location, index };
           }
           completed++;
           if (completed === toGeocode.length) {
@@ -285,7 +269,7 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
     });
   }, [doctors]);
 
-  // Highlight marker color on hover — fixed scale, no map movement
+  // Highlight marker color on hover
   useEffect(() => {
     if (!window.google?.maps) return;
     markersRef.current.forEach(marker => {
@@ -430,7 +414,6 @@ export default function Search() {
     <div style={{ fontFamily: "system-ui, sans-serif", background: C.bg, minHeight: "100vh" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* NAV */}
       <nav style={{ position: "sticky", top: 0, zIndex: 200, background: "rgba(253,250,245,0.97)", backdropFilter: "blur(12px)", borderBottom: `1px solid rgba(26,107,138,0.12)`, padding: isMobile ? "0.75rem 1rem" : "0.8rem 1.2rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: isMobile ? "0.6rem" : 0 }}>
           <div onClick={() => navigate("/")} style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 17 : 19, color: C.ocean, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Your Doctor <span style={{ color: C.dusk }}>SD</span></div>
@@ -454,7 +437,6 @@ export default function Search() {
         )}
       </nav>
 
-      {/* Mobile filter drawer */}
       {isMobile && showFilters && <>
         <div onClick={() => setShowFilters(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 300 }} />
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 400, background: "white", borderRadius: "20px 20px 0 0", padding: "1.5rem 1.2rem 2rem", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 -8px 30px rgba(0,0,0,0.15)" }}>
@@ -466,10 +448,7 @@ export default function Search() {
         </div>
       </>}
 
-      {/* MAIN CONTENT */}
       <div style={{ maxWidth: showMap && !isMobile ? 1400 : 1050, margin: "0 auto", padding: isMobile ? "1rem" : "1.2rem 1.2rem 3rem", display: "flex", gap: "1.2rem", alignItems: "flex-start" }}>
-
-        {/* Filter sidebar */}
         {!isMobile && (
           <aside style={{ width: 200, flexShrink: 0 }}>
             <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "1.1rem", position: "sticky", top: 72 }}>
@@ -480,7 +459,6 @@ export default function Search() {
           </aside>
         )}
 
-        {/* Results list */}
         <main style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <div style={{ fontSize: 13, color: C.muted }}>
@@ -513,14 +491,7 @@ export default function Search() {
             </div>
           )}
           {!loading && !error && pageData.map((doc, i) => (
-            <DoctorCard
-              key={doc.npi || i}
-              doc={doc}
-              isMobile={isMobile}
-              highlighted={highlightedNpi === doc.npi}
-              onHover={setHighlightedNpi}
-              cardRef={el => cardRefs.current[doc.npi] = el}
-            />
+            <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} highlighted={highlightedNpi === doc.npi} onHover={setHighlightedNpi} cardRef={el => cardRefs.current[doc.npi] = el} />
           ))}
           {totalPages > 1 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 20, flexWrap: "wrap" }}>
@@ -538,7 +509,6 @@ export default function Search() {
           )}
         </main>
 
-        {/* Map panel - desktop only */}
         {!isMobile && showMap && (
           <div style={{ width: 420, flexShrink: 0, position: "sticky", top: 72, height: "calc(100vh - 90px)" }}>
             <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 14, overflow: "hidden", height: "100%" }}>
@@ -548,11 +518,7 @@ export default function Search() {
               </div>
               <div style={{ height: "calc(100% - 44px)" }}>
                 {!loading && pageData.length > 0 ? (
-                  <SearchMap
-                    doctors={pageData}
-                    highlightedNpi={highlightedNpi}
-                    onPinClick={handlePinClick}
-                  />
+                  <SearchMap doctors={pageData} highlightedNpi={highlightedNpi} onPinClick={handlePinClick} />
                 ) : (
                   <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted, gap: 8 }}>
                     <span style={{ fontSize: 32 }}>🗺️</span>
