@@ -159,6 +159,7 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
+  const userClickedPinRef = useRef(false); // prevents fitBounds from overriding pin click zoom
 
   // Init map once
   useEffect(() => {
@@ -192,12 +193,16 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
   useEffect(() => {
     if (!mapInstanceRef.current || !window.google?.maps || !doctors.length) return;
 
+    // Reset the pin-clicked flag when new doctors load
+    userClickedPinRef.current = false;
+
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
 
     const geocoder = new window.google.maps.Geocoder();
     const bounds = new window.google.maps.LatLngBounds();
     let placed = 0;
+    const total = doctors.filter(d => d.address && d.city).length;
 
     doctors.forEach((doc, index) => {
       if (!doc.address || !doc.city) return;
@@ -232,10 +237,12 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
 
           marker._npi = doc.npi;
           marker._doc = doc;
-          marker._position = position;
 
           marker.addListener("click", () => {
-            // Zoom in to the marker — don't use fitBounds
+            // Lock out fitBounds from resetting the view
+            userClickedPinRef.current = true;
+
+            // Zoom in smoothly to the pin
             mapInstanceRef.current.panTo(position);
             mapInstanceRef.current.setZoom(15);
 
@@ -251,15 +258,14 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
               infoWindowRef.current.open(mapInstanceRef.current, marker);
             }
 
-            // Highlight the card in the list
             if (onPinClick) onPinClick(doc.npi);
           });
 
           markersRef.current.push(marker);
           placed++;
 
-          // Fit bounds after first few markers come in
-          if (placed >= Math.min(doctors.length, 3)) {
+          // Only fitBounds if user hasn't clicked a pin
+          if (placed >= total && !userClickedPinRef.current) {
             mapInstanceRef.current.fitBounds(bounds);
             const listener = mapInstanceRef.current.addListener("idle", () => {
               if (mapInstanceRef.current.getZoom() > 13) mapInstanceRef.current.setZoom(13);
@@ -271,7 +277,7 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
     });
   }, [doctors]);
 
-  // Update marker colors when highlight changes — keep scale fixed to avoid map jumping
+  // Update marker colors on highlight — fixed scale to prevent map jumping
   useEffect(() => {
     if (!window.google?.maps) return;
     markersRef.current.forEach(marker => {
@@ -393,7 +399,6 @@ export default function Search() {
 
   useEffect(() => { fetchDoctors(); }, []);
 
-  // When a pin is clicked, highlight card and scroll it into view
   function handlePinClick(npi) {
     setHighlightedNpi(npi);
     setTimeout(() => {
