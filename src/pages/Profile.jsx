@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { COLORS as C } from "../data/doctors";
 
@@ -98,6 +98,45 @@ function ReportForm({ onClose }) {
   );
 }
 
+function GoogleMap({ address, city }) {
+  const mapRef = useRef(null);
+  const fullAddress = `${address}, ${city}, CA`;
+
+  useEffect(() => {
+    if (!address) return;
+
+    function initMap() {
+      if (!mapRef.current || !window.google) return;
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: fullAddress }, (results, status) => {
+        if (status === "OK" && mapRef.current) {
+          const map = new window.google.maps.Map(mapRef.current, {
+            zoom: 15,
+            center: results[0].geometry.location,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+          });
+          new window.google.maps.Marker({
+            map,
+            position: results[0].geometry.location,
+            title: fullAddress,
+          });
+        }
+      });
+    }
+
+    if (window.google) {
+      initMap();
+    } else {
+      window.addEventListener("load", initMap);
+      return () => window.removeEventListener("load", initMap);
+    }
+  }, [fullAddress]);
+
+  return <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 10 }} />;
+}
+
 export default function Profile() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -108,7 +147,6 @@ export default function Profile() {
   const [doc, setDoc] = useState(location.state?.doc || null);
   const [loading, setLoading] = useState(!doc);
 
-  // If no doc passed via state, fetch from Supabase by NPI
   useEffect(() => {
     if (doc) return;
     async function fetchDoc() {
@@ -172,7 +210,7 @@ export default function Profile() {
         <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: "radial-gradient(circle at 20% 80%, #4db8d4 0%, transparent 50%), radial-gradient(circle at 80% 20%, #a8d8bc 0%, transparent 50%)" }} />
         <div style={{ maxWidth: 900, margin: "0 auto", position: "relative", zIndex: 1, display: "flex", gap: isMobile ? "1rem" : "1.8rem", alignItems: "flex-start", flexWrap: isMobile ? "wrap" : "nowrap" }}>
 
-          {/* Avatar with photo upload */}
+          {/* Avatar */}
           <div style={{ position: "relative", flexShrink: 0 }}>
             <div style={{ width: isMobile ? 80 : 100, height: isMobile ? 80 : 100, borderRadius: "50%", overflow: "hidden", background: photo ? "transparent" : "rgba(255,255,255,0.15)", border: "3px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif", fontWeight: 700, fontSize: isMobile ? 24 : 32, color: "white" }}>
               {photo ? <img src={photo} alt={doc.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}
@@ -220,7 +258,6 @@ export default function Profile() {
             {doc.phone && doc.phone !== "Call for number" && (
               <a href={`tel:${doc.phone}`} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: C.dusk, color: "white", textDecoration: "none", padding: "0.7rem", borderRadius: 10, fontWeight: 600, fontSize: 14 }}>📞 Call</a>
             )}
-
           </div>
         )}
       </div>
@@ -229,7 +266,6 @@ export default function Profile() {
       <div style={{ maxWidth: 900, margin: "0 auto", padding: isMobile ? "1rem" : "1.5rem 1.2rem 3rem", display: "flex", gap: "1.2rem", alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
 
-          {/* Verified info OR claim nudge */}
           {isVerified ? (
             <>
               {doc.bio && (
@@ -260,11 +296,11 @@ export default function Profile() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {[
-                  { label: "Accepting New Patients", value: null },
-                  { label: "Telehealth Available", value: null },
-                  { label: "Insurance Accepted", value: null },
-                  { label: "Languages Spoken", value: null },
-                  { label: "Office Hours", value: null },
+                  { label: "Accepting New Patients" },
+                  { label: "Telehealth Available" },
+                  { label: "Insurance Accepted" },
+                  { label: "Languages Spoken" },
+                  { label: "Office Hours" },
                 ].map(({ label }) => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.7rem 0", borderBottom: `1px solid ${C.border}` }}>
                     <span style={{ fontSize: 14, color: C.text, fontWeight: 500 }}>{label}</span>
@@ -308,14 +344,19 @@ export default function Profile() {
                   <span>📞</span><span>{doc.phone}</span>
                 </div>
               )}
-              <div style={{ background: `linear-gradient(135deg, rgba(26,107,138,0.08), rgba(77,184,212,0.12))`, border: `1px solid ${C.border}`, borderRadius: 10, height: 130, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 12, marginTop: 8, gap: 6, cursor: "pointer" }}
-                onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`, '_blank')}
+              {doc.address && (
+                <div style={{ height: 150, marginTop: 8, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                  <GoogleMap address={doc.address} city={doc.city} />
+                </div>
+              )}
+              
+                href={`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: "block", textAlign: "center", fontSize: 12, color: C.ocean, marginTop: 8 }}
               >
-                <span style={{ fontSize: 28 }}>🗺️</span>
-                <span>View on Maps</span>
-                <span style={{ fontSize: 10, opacity: 0.7 }}>{doc.address}, {doc.city}</span>
-              </div>
-
+                Open in Google Maps ↗
+              </a>
               {!isVerified && (
                 <button onClick={() => navigate("/claim")} style={{ width: "100%", marginTop: "1rem", background: C.ocean, color: "white", border: "none", padding: "0.65rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   🏥 Claim This Listing
@@ -326,7 +367,7 @@ export default function Profile() {
         )}
       </div>
 
-      {/* Mobile sidebar info */}
+      {/* Mobile Location */}
       {isMobile && (
         <div style={{ padding: "0 1rem 2rem" }}>
           <Section title="Contact & Location">
@@ -340,12 +381,19 @@ export default function Profile() {
                 <span>📞</span><span>{doc.phone}</span>
               </div>
             )}
-            <div style={{ background: `linear-gradient(135deg, rgba(26,107,138,0.08), rgba(77,184,212,0.12))`, border: `1px solid ${C.border}`, borderRadius: 10, height: 110, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 13, gap: 5, cursor: "pointer" }}
-              onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`, '_blank')}
+            {doc.address && (
+              <div style={{ height: 160, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                <GoogleMap address={doc.address} city={doc.city} />
+              </div>
+            )}
+            
+              href={`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: "block", textAlign: "center", fontSize: 12, color: C.ocean, marginTop: 8 }}
             >
-              <span style={{ fontSize: 26 }}>🗺️</span>
-              <span>View on Maps</span>
-            </div>
+              Open in Google Maps ↗
+            </a>
             {!isVerified && (
               <button onClick={() => navigate("/claim")} style={{ width: "100%", marginTop: "1rem", background: C.ocean, color: "white", border: "none", padding: "0.65rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                 🏥 Claim This Listing
