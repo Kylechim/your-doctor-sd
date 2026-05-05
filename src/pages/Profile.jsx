@@ -45,22 +45,6 @@ function ClaimNudge({ navigate }) {
   );
 }
 
-function CommunityReport({ report }) {
-  const [helpful, setHelpful] = useState(report.helpful);
-  const [voted, setVoted] = useState(false);
-  return (
-    <div style={{ padding: "0.9rem 0", borderBottom: `1px solid ${C.border}` }}>
-      <div style={{ fontSize: 14, color: C.text, lineHeight: 1.6, marginBottom: 6 }}>"{report.text}"</div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 11, color: C.muted }}>Reported by community · {report.date}</div>
-        <button onClick={() => { if (!voted) { setHelpful(h => h + 1); setVoted(true); }}} style={{ display: "flex", alignItems: "center", gap: 5, background: voted ? "#edfaf3" : "white", border: `1px solid ${voted ? "#b2e5cc" : C.border}`, color: voted ? "#1a7a4a" : C.muted, padding: "3px 10px", borderRadius: 20, fontSize: 12, cursor: voted ? "default" : "pointer", fontFamily: "inherit" }}>
-          👍 Helpful ({helpful})
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function ReportForm({ onClose }) {
   const [text, setText] = useState("");
   const [category, setCategory] = useState("accepting");
@@ -101,38 +85,67 @@ function ReportForm({ onClose }) {
 function GoogleMap({ address, city }) {
   const mapRef = useRef(null);
   const fullAddress = `${address}, ${city}, CA`;
+  const [mapError, setMapError] = useState(false);
 
   useEffect(() => {
-    if (!address) return;
+    if (!address || !mapRef.current) return;
 
     function initMap() {
-      if (!mapRef.current || !window.google) return;
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: fullAddress }, (results, status) => {
-        if (status === "OK" && mapRef.current) {
-          const map = new window.google.maps.Map(mapRef.current, {
-            zoom: 15,
-            center: results[0].geometry.location,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-          });
-          new window.google.maps.Marker({
-            map,
-            position: results[0].geometry.location,
-            title: fullAddress,
-          });
-        }
-      });
+      if (!mapRef.current) return;
+      if (!window.google || !window.google.maps) {
+        setMapError(true);
+        return;
+      }
+      try {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: fullAddress }, (results, status) => {
+          if (status === "OK" && results[0] && mapRef.current) {
+            const map = new window.google.maps.Map(mapRef.current, {
+              zoom: 15,
+              center: results[0].geometry.location,
+              mapTypeControl: false,
+              streetViewControl: false,
+              fullscreenControl: false,
+            });
+            new window.google.maps.Marker({
+              map,
+              position: results[0].geometry.location,
+              title: fullAddress,
+            });
+          } else {
+            setMapError(true);
+          }
+        });
+      } catch (e) {
+        setMapError(true);
+      }
     }
 
-    if (window.google) {
-      initMap();
-    } else {
-      window.addEventListener("load", initMap);
-      return () => window.removeEventListener("load", initMap);
-    }
+    // Poll until Google Maps SDK is ready (handles async defer loading)
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (window.google && window.google.maps) {
+        clearInterval(interval);
+        initMap();
+      } else if (attempts > 20) {
+        clearInterval(interval);
+        setMapError(true);
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
   }, [fullAddress]);
+
+  if (mapError) return (
+    <div
+      style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, rgba(26,107,138,0.08), rgba(77,184,212,0.12))`, borderRadius: 10, gap: 6, cursor: "pointer", color: C.muted, fontSize: 12 }}
+      onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`, '_blank')}
+    >
+      <span style={{ fontSize: 26 }}>🗺️</span>
+      <span>View on Google Maps</span>
+    </div>
+  );
 
   return <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 10 }} />;
 }
