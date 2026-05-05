@@ -106,11 +106,12 @@ function Spinner() {
   );
 }
 
-function DoctorCard({ doc, isMobile, highlighted, onHover }) {
+function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
   const navigate = useNavigate();
   const initials = doc.name.replace(/Dr\.\s*/, "").split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   return (
     <div
+      ref={cardRef}
       onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })}
       onMouseEnter={() => onHover && onHover(doc.npi)}
       onMouseLeave={() => onHover && onHover(null)}
@@ -153,17 +154,11 @@ function DoctorCard({ doc, isMobile, highlighted, onHover }) {
 }
 
 // ── SEARCH MAP ──────────────────────────────────────────────────────────────
-function SearchMap({ doctors, highlightedNpi, onMarkerClick }) {
+function SearchMap({ doctors, highlightedNpi, onPinClick }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
-  const highlightedNpiRef = useRef(highlightedNpi);
-
-  // Keep ref in sync without triggering re-renders
-  useEffect(() => {
-    highlightedNpiRef.current = highlightedNpi;
-  }, [highlightedNpi]);
 
   // Init map once
   useEffect(() => {
@@ -197,7 +192,6 @@ function SearchMap({ doctors, highlightedNpi, onMarkerClick }) {
   useEffect(() => {
     if (!mapInstanceRef.current || !window.google?.maps || !doctors.length) return;
 
-    // Clear old markers
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
 
@@ -238,10 +232,14 @@ function SearchMap({ doctors, highlightedNpi, onMarkerClick }) {
 
           marker._npi = doc.npi;
           marker._doc = doc;
+          marker._position = position;
 
-          // Click opens info window only — no hover icon changes
           marker.addListener("click", () => {
-            if (infoWindowRef.current && mapInstanceRef.current) {
+            // Zoom in to the marker — don't use fitBounds
+            mapInstanceRef.current.panTo(position);
+            mapInstanceRef.current.setZoom(15);
+
+            if (infoWindowRef.current) {
               infoWindowRef.current.setContent(`
                 <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
                   <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
@@ -252,12 +250,15 @@ function SearchMap({ doctors, highlightedNpi, onMarkerClick }) {
               `);
               infoWindowRef.current.open(mapInstanceRef.current, marker);
             }
-            if (onMarkerClick) onMarkerClick(doc.npi);
+
+            // Highlight the card in the list
+            if (onPinClick) onPinClick(doc.npi);
           });
 
           markersRef.current.push(marker);
           placed++;
 
+          // Fit bounds after first few markers come in
           if (placed >= Math.min(doctors.length, 3)) {
             mapInstanceRef.current.fitBounds(bounds);
             const listener = mapInstanceRef.current.addListener("idle", () => {
@@ -270,7 +271,7 @@ function SearchMap({ doctors, highlightedNpi, onMarkerClick }) {
     });
   }, [doctors]);
 
-  // Highlight marker on card hover — only change fillColor, nothing else
+  // Update marker colors when highlight changes — keep scale fixed to avoid map jumping
   useEffect(() => {
     if (!window.google?.maps) return;
     markersRef.current.forEach(marker => {
@@ -283,6 +284,7 @@ function SearchMap({ doctors, highlightedNpi, onMarkerClick }) {
         strokeColor: "white",
         strokeWeight: isHighlighted ? 3 : 2,
       });
+      marker.setZIndex(isHighlighted ? 999 : undefined);
     });
   }, [highlightedNpi]);
 
@@ -362,6 +364,7 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [highlightedNpi, setHighlightedNpi] = useState(null);
+  const cardRefs = useRef({});
   const perPage = 20;
 
   const fetchDoctors = useCallback(async () => {
@@ -389,6 +392,15 @@ export default function Search() {
   }, [query, neighborhood, specialtySearch, gender, accepting, telehealth, selectedLangs]);
 
   useEffect(() => { fetchDoctors(); }, []);
+
+  // When a pin is clicked, highlight card and scroll it into view
+  function handlePinClick(npi) {
+    setHighlightedNpi(npi);
+    setTimeout(() => {
+      const el = cardRefs.current[npi];
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+  }
 
   const sortedResults = sort === "smart" ? smartSort(results)
     : sort === "name" ? [...results].sort((a, b) => a.name.localeCompare(b.name))
@@ -488,7 +500,14 @@ export default function Search() {
             </div>
           )}
           {!loading && !error && pageData.map((doc, i) => (
-            <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} highlighted={highlightedNpi === doc.npi} onHover={setHighlightedNpi} />
+            <DoctorCard
+              key={doc.npi || i}
+              doc={doc}
+              isMobile={isMobile}
+              highlighted={highlightedNpi === doc.npi}
+              onHover={setHighlightedNpi}
+              cardRef={el => cardRefs.current[doc.npi] = el}
+            />
           ))}
           {totalPages > 1 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 20, flexWrap: "wrap" }}>
@@ -519,7 +538,7 @@ export default function Search() {
                   <SearchMap
                     doctors={pageData}
                     highlightedNpi={highlightedNpi}
-                    onMarkerClick={setHighlightedNpi}
+                    onPinClick={handlePinClick}
                   />
                 ) : (
                   <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted, gap: 8 }}>
