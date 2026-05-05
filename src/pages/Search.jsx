@@ -154,12 +154,14 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
 }
 
 // ── SEARCH MAP ──────────────────────────────────────────────────────────────
+// Geocodes all doctors first, then places all markers at once.
+// This means fitBounds fires exactly once and never races with pin clicks.
 function SearchMap({ doctors, highlightedNpi, onPinClick }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
-  const userClickedPinRef = useRef(false); // prevents fitBounds from overriding pin click zoom
+  const geocodedRef = useRef(false); // true once initial fitBounds has fired
 
   // Init map once
   useEffect(() => {
@@ -189,95 +191,101 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
     }
   }, []);
 
-  // Place markers when doctors change
+  // When doctors change: geocode all, then place all markers, then fitBounds once
   useEffect(() => {
     if (!mapInstanceRef.current || !window.google?.maps || !doctors.length) return;
 
-    // Reset the pin-clicked flag when new doctors load
-    userClickedPinRef.current = false;
-
+    // Clear old markers
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
+    geocodedRef.current = false;
 
     const geocoder = new window.google.maps.Geocoder();
-    const bounds = new window.google.maps.LatLngBounds();
-    let placed = 0;
-    const total = doctors.filter(d => d.address && d.city).length;
+    const toGeocode = doctors.filter(d => d.address && d.city);
+    const results = new Array(toGeocode.length).fill(null);
+    let completed = 0;
 
-    doctors.forEach((doc, index) => {
-      if (!doc.address || !doc.city) return;
-      const fullAddress = `${doc.address}, ${doc.city}, CA`;
+    function placeAllMarkers() {
+      const bounds = new window.google.maps.LatLngBounds();
+      const validResults = results.filter(Boolean);
 
+      validResults.forEach(({ doc, position, index }) => {
+        const marker = new window.google.maps.Marker({
+          map: mapInstanceRef.current,
+          position,
+          title: doc.name,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 9,
+            fillColor: C.ocean,
+            fillOpacity: 1,
+            strokeColor: "white",
+            strokeWeight: 2,
+          },
+          label: {
+            text: String(index + 1),
+            color: "white",
+            fontSize: "10px",
+            fontWeight: "bold",
+          },
+        });
+
+        marker._npi = doc.npi;
+        marker._position = position;
+
+        marker.addListener("click", () => {
+          // Mark that user has taken control of the map view
+          geocodedRef.current = true;
+
+          mapInstanceRef.current.panTo(position);
+          mapInstanceRef.current.setZoom(15);
+
+          if (infoWindowRef.current) {
+            infoWindowRef.current.setContent(`
+              <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
+                <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
+                <div style="color:#1a6b8a;font-size:12px;margin-bottom:4px;">${doc.specialty}</div>
+                <div style="color:#6b8f99;font-size:11px;">${doc.address}, ${doc.city}</div>
+                ${doc.accepting === true ? '<div style="color:#1a7a4a;font-size:11px;margin-top:4px;">✅ Accepting patients</div>' : ''}
+              </div>
+            `);
+            infoWindowRef.current.open(mapInstanceRef.current, marker);
+          }
+
+          if (onPinClick) onPinClick(doc.npi);
+        });
+
+        markersRef.current.push(marker);
+        bounds.extend(position);
+      });
+
+      // fitBounds only fires here, after ALL geocoding is done
+      if (validResults.length > 0 && !geocodedRef.current) {
+        mapInstanceRef.current.fitBounds(bounds);
+        mapInstanceRef.current.addListener("idle", function handler() {
+          if (mapInstanceRef.current.getZoom() > 13) mapInstanceRef.current.setZoom(13);
+          window.google.maps.event.removeListener(this);
+        });
+        geocodedRef.current = true; // never fitBounds again until doctors change
+      }
+    }
+
+    toGeocode.forEach((doc, index) => {
       setTimeout(() => {
-        geocoder.geocode({ address: fullAddress }, (results, status) => {
-          if (status !== "OK" || !results[0] || !mapInstanceRef.current) return;
-
-          const position = results[0].geometry.location;
-          bounds.extend(position);
-
-          const marker = new window.google.maps.Marker({
-            map: mapInstanceRef.current,
-            position,
-            title: doc.name,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 9,
-              fillColor: C.ocean,
-              fillOpacity: 1,
-              strokeColor: "white",
-              strokeWeight: 2,
-            },
-            label: {
-              text: String(index + 1),
-              color: "white",
-              fontSize: "10px",
-              fontWeight: "bold",
-            },
-          });
-
-          marker._npi = doc.npi;
-          marker._doc = doc;
-
-          marker.addListener("click", () => {
-            // Lock out fitBounds from resetting the view
-            userClickedPinRef.current = true;
-
-            // Zoom in smoothly to the pin
-            mapInstanceRef.current.panTo(position);
-            mapInstanceRef.current.setZoom(15);
-
-            if (infoWindowRef.current) {
-              infoWindowRef.current.setContent(`
-                <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
-                  <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
-                  <div style="color:#1a6b8a;font-size:12px;margin-bottom:4px;">${doc.specialty}</div>
-                  <div style="color:#6b8f99;font-size:11px;">${doc.address}, ${doc.city}</div>
-                  ${doc.accepting === true ? '<div style="color:#1a7a4a;font-size:11px;margin-top:4px;">✅ Accepting patients</div>' : ''}
-                </div>
-              `);
-              infoWindowRef.current.open(mapInstanceRef.current, marker);
-            }
-
-            if (onPinClick) onPinClick(doc.npi);
-          });
-
-          markersRef.current.push(marker);
-          placed++;
-
-          // Only fitBounds if user hasn't clicked a pin
-          if (placed >= total && !userClickedPinRef.current) {
-            mapInstanceRef.current.fitBounds(bounds);
-            const listener = mapInstanceRef.current.addListener("idle", () => {
-              if (mapInstanceRef.current.getZoom() > 13) mapInstanceRef.current.setZoom(13);
-              window.google.maps.event.removeListener(listener);
-            });
+        geocoder.geocode({ address: `${doc.address}, ${doc.city}, CA` }, (geoResults, status) => {
+          if (status === "OK" && geoResults[0]) {
+            results[index] = { doc, position: geoResults[0].geometry.location, index };
+          }
+          completed++;
+          if (completed === toGeocode.length) {
+            placeAllMarkers();
           }
         });
       }, index * 80);
     });
   }, [doctors]);
 
-  // Update marker colors on highlight — fixed scale to prevent map jumping
+  // Highlight marker color on hover — fixed scale, no map movement
   useEffect(() => {
     if (!window.google?.maps) return;
     markersRef.current.forEach(marker => {
