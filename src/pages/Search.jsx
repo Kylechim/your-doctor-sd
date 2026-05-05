@@ -114,7 +114,7 @@ function DoctorCard({ doc, isMobile, highlighted, onHover }) {
       onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })}
       onMouseEnter={() => onHover && onHover(doc.npi)}
       onMouseLeave={() => onHover && onHover(null)}
-      style={{ background: "white", border: `1.5px solid ${highlighted ? C.ocean : C.border}`, borderRadius: 14, padding: isMobile ? "1rem" : "1.1rem 1.3rem", marginBottom: "0.75rem", cursor: "pointer", transition: "box-shadow 0.2s, transform 0.2s, border-color 0.2s", boxShadow: highlighted ? `0 6px 20px rgba(26,107,138,0.15)` : "none", transform: highlighted ? "translateY(-2px)" : "none" }}
+      style={{ background: "white", border: `1.5px solid ${highlighted ? C.ocean : C.border}`, borderRadius: 14, padding: isMobile ? "1rem" : "1.1rem 1.3rem", marginBottom: "0.75rem", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.15s", boxShadow: highlighted ? `0 4px 16px rgba(26,107,138,0.13)` : "none" }}
     >
       <div style={{ display: "flex", gap: "0.8rem", alignItems: "flex-start" }}>
         <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, background: `linear-gradient(135deg, ${C.sky}, ${C.ocean})`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 14 }}>{initials}</div>
@@ -153,51 +153,49 @@ function DoctorCard({ doc, isMobile, highlighted, onHover }) {
 }
 
 // ── SEARCH MAP ──────────────────────────────────────────────────────────────
-function SearchMap({ doctors, highlightedNpi, onMarkerHover }) {
+function SearchMap({ doctors, highlightedNpi, onMarkerClick }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
+  const highlightedNpiRef = useRef(highlightedNpi);
 
+  // Keep ref in sync without triggering re-renders
   useEffect(() => {
-    if (!mapRef.current) return;
+    highlightedNpiRef.current = highlightedNpi;
+  }, [highlightedNpi]);
 
+  // Init map once
+  useEffect(() => {
     function initMap() {
-      if (!window.google || !window.google.maps || !mapRef.current) return;
-
-      // Create map centered on San Diego
+      if (!mapRef.current || !window.google?.maps) return;
       const map = new window.google.maps.Map(mapRef.current, {
         zoom: 11,
         center: { lat: 32.7157, lng: -117.1611 },
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_TOP },
       });
       mapInstanceRef.current = map;
       infoWindowRef.current = new window.google.maps.InfoWindow();
     }
 
-    if (window.google && window.google.maps) {
+    if (window.google?.maps) {
       initMap();
     } else {
       let attempts = 0;
       const interval = setInterval(() => {
         attempts++;
-        if (window.google && window.google.maps) {
-          clearInterval(interval);
-          initMap();
-        } else if (attempts > 20) {
-          clearInterval(interval);
-        }
+        if (window.google?.maps) { clearInterval(interval); initMap(); }
+        else if (attempts > 20) clearInterval(interval);
       }, 250);
       return () => clearInterval(interval);
     }
   }, []);
 
-  // Geocode and place markers when doctors change
+  // Place markers when doctors change
   useEffect(() => {
-    if (!mapInstanceRef.current || !window.google || !doctors.length) return;
+    if (!mapInstanceRef.current || !window.google?.maps || !doctors.length) return;
 
     // Clear old markers
     markersRef.current.forEach(m => m.setMap(null));
@@ -205,13 +203,12 @@ function SearchMap({ doctors, highlightedNpi, onMarkerHover }) {
 
     const geocoder = new window.google.maps.Geocoder();
     const bounds = new window.google.maps.LatLngBounds();
-    let geocodedCount = 0;
+    let placed = 0;
 
     doctors.forEach((doc, index) => {
       if (!doc.address || !doc.city) return;
       const fullAddress = `${doc.address}, ${doc.city}, CA`;
 
-      // Stagger geocode requests slightly to avoid hitting rate limits
       setTimeout(() => {
         geocoder.geocode({ address: fullAddress }, (results, status) => {
           if (status !== "OK" || !results[0] || !mapInstanceRef.current) return;
@@ -226,7 +223,7 @@ function SearchMap({ doctors, highlightedNpi, onMarkerHover }) {
             icon: {
               path: window.google.maps.SymbolPath.CIRCLE,
               scale: 9,
-              fillColor: doc.verified ? C.dusk : C.ocean,
+              fillColor: C.ocean,
               fillOpacity: 1,
               strokeColor: "white",
               strokeWeight: 2,
@@ -240,34 +237,28 @@ function SearchMap({ doctors, highlightedNpi, onMarkerHover }) {
           });
 
           marker._npi = doc.npi;
+          marker._doc = doc;
 
+          // Click opens info window only — no hover icon changes
           marker.addListener("click", () => {
-            if (infoWindowRef.current) {
+            if (infoWindowRef.current && mapInstanceRef.current) {
               infoWindowRef.current.setContent(`
-                <div style="font-family: system-ui, sans-serif; padding: 4px; min-width: 160px;">
-                  <div style="font-weight: 700; color: #0d3d52; font-size: 13px; margin-bottom: 2px;">${doc.name}</div>
-                  <div style="color: #1a6b8a; font-size: 12px; margin-bottom: 4px;">${doc.specialty}</div>
-                  <div style="color: #6b8f99; font-size: 11px;">${doc.address}, ${doc.city}</div>
-                  ${doc.accepting === true ? '<div style="color: #1a7a4a; font-size: 11px; margin-top: 4px;">✅ Accepting patients</div>' : ''}
+                <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
+                  <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
+                  <div style="color:#1a6b8a;font-size:12px;margin-bottom:4px;">${doc.specialty}</div>
+                  <div style="color:#6b8f99;font-size:11px;">${doc.address}, ${doc.city}</div>
+                  ${doc.accepting === true ? '<div style="color:#1a7a4a;font-size:11px;margin-top:4px;">✅ Accepting patients</div>' : ''}
                 </div>
               `);
               infoWindowRef.current.open(mapInstanceRef.current, marker);
             }
-            if (onMarkerHover) onMarkerHover(doc.npi);
-          });
-
-          marker.addListener("mouseover", () => {
-            if (onMarkerHover) onMarkerHover(doc.npi);
-          });
-          marker.addListener("mouseout", () => {
-            if (onMarkerHover) onMarkerHover(null);
+            if (onMarkerClick) onMarkerClick(doc.npi);
           });
 
           markersRef.current.push(marker);
-          geocodedCount++;
+          placed++;
 
-          // Fit map to all markers once we have a few
-          if (geocodedCount >= Math.min(doctors.length, 3)) {
+          if (placed >= Math.min(doctors.length, 3)) {
             mapInstanceRef.current.fitBounds(bounds);
             const listener = mapInstanceRef.current.addListener("idle", () => {
               if (mapInstanceRef.current.getZoom() > 13) mapInstanceRef.current.setZoom(13);
@@ -275,29 +266,27 @@ function SearchMap({ doctors, highlightedNpi, onMarkerHover }) {
             });
           }
         });
-      }, index * 100);
+      }, index * 80);
     });
   }, [doctors]);
 
-  // Highlight marker when card is hovered
+  // Highlight marker on card hover — only change fillColor, nothing else
   useEffect(() => {
+    if (!window.google?.maps) return;
     markersRef.current.forEach(marker => {
       const isHighlighted = marker._npi === highlightedNpi;
       marker.setIcon({
         path: window.google.maps.SymbolPath.CIRCLE,
-        scale: isHighlighted ? 12 : 9,
-        fillColor: isHighlighted ? C.dusk : C.ocean,
+        scale: 9,
+        fillColor: isHighlighted ? "#e8622a" : C.ocean,
         fillOpacity: 1,
         strokeColor: "white",
-        strokeWeight: 2,
+        strokeWeight: isHighlighted ? 3 : 2,
       });
-      marker.setZIndex(isHighlighted ? 999 : 1);
     });
   }, [highlightedNpi]);
 
-  return (
-    <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 12 }} />
-  );
+  return <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 12 }} />;
 }
 
 function FilterPanel({ specialtySearch, setSpecialtySearch, neighborhood, setNeighborhood, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
@@ -342,7 +331,6 @@ function FilterPanel({ specialtySearch, setSpecialtySearch, neighborhood, setNei
   );
 }
 
-// Smart sort: verified first, then accepting, then alphabetical
 function smartSort(results) {
   return [...results].sort((a, b) => {
     if (a.verified && !b.verified) return -1;
@@ -402,7 +390,6 @@ export default function Search() {
 
   useEffect(() => { fetchDoctors(); }, []);
 
-  // Apply sort
   const sortedResults = sort === "smart" ? smartSort(results)
     : sort === "name" ? [...results].sort((a, b) => a.name.localeCompare(b.name))
     : sort === "city" ? [...results].sort((a, b) => a.city.localeCompare(b.city))
@@ -425,11 +412,7 @@ export default function Search() {
           {!isMobile && (
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: 15, color: C.muted, fontStyle: "italic" }}>Finding care, made simple.</span>
-              {/* Map toggle - desktop */}
-              <button
-                onClick={() => setShowMap(m => !m)}
-                style={{ display: "flex", alignItems: "center", gap: 6, background: showMap ? C.ocean : "white", color: showMap ? "white" : C.ocean, border: `1.5px solid ${C.ocean}`, padding: "0.4rem 0.9rem", borderRadius: 8, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-              >
+              <button onClick={() => setShowMap(m => !m)} style={{ display: "flex", alignItems: "center", gap: 6, background: showMap ? C.ocean : "white", color: showMap ? "white" : C.ocean, border: `1.5px solid ${C.ocean}`, padding: "0.4rem 0.9rem", borderRadius: 8, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 🗺️ {showMap ? "Hide Map" : "Show Map"}
               </button>
             </div>
@@ -505,13 +488,7 @@ export default function Search() {
             </div>
           )}
           {!loading && !error && pageData.map((doc, i) => (
-            <DoctorCard
-              key={doc.npi || i}
-              doc={doc}
-              isMobile={isMobile}
-              highlighted={highlightedNpi === doc.npi}
-              onHover={setHighlightedNpi}
-            />
+            <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} highlighted={highlightedNpi === doc.npi} onHover={setHighlightedNpi} />
           ))}
           {totalPages > 1 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 20, flexWrap: "wrap" }}>
@@ -534,18 +511,17 @@ export default function Search() {
           <div style={{ width: 420, flexShrink: 0, position: "sticky", top: 72, height: "calc(100vh - 90px)" }}>
             <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 14, overflow: "hidden", height: "100%" }}>
               <div style={{ padding: "0.7rem 1rem", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: C.deep }}>📍 Showing {pageData.length} providers on map</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.deep }}>📍 {pageData.length} providers on map</span>
                 <span style={{ fontSize: 11, color: C.muted }}>Page {page} of {totalPages || 1}</span>
               </div>
               <div style={{ height: "calc(100% - 44px)" }}>
-                {!loading && pageData.length > 0 && (
+                {!loading && pageData.length > 0 ? (
                   <SearchMap
                     doctors={pageData}
                     highlightedNpi={highlightedNpi}
-                    onMarkerHover={setHighlightedNpi}
+                    onMarkerClick={setHighlightedNpi}
                   />
-                )}
-                {(loading || pageData.length === 0) && (
+                ) : (
                   <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted, gap: 8 }}>
                     <span style={{ fontSize: 32 }}>🗺️</span>
                     <span style={{ fontSize: 13 }}>{loading ? "Loading results…" : "Search to see providers on map"}</span>
