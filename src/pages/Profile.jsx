@@ -349,7 +349,7 @@ export default function Profile() {
                   <GoogleMap address={doc.address} city={doc.city} />
                 </div>
               )}
-              
+              <a
                 href={`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`}
                 target="_blank"
                 rel="noreferrer"
@@ -386,7 +386,7 @@ export default function Profile() {
                 <GoogleMap address={doc.address} city={doc.city} />
               </div>
             )}
-            
+            <a
               href={`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`}
               target="_blank"
               rel="noreferrer"
