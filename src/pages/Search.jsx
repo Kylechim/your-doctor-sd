@@ -5,9 +5,6 @@ import { NEIGHBORHOODS, ALL_LANGUAGES, COLORS as C } from "../data/doctors";
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
 
-
-
-
 // ── SPECIALTY AUTOCOMPLETE ──────────────────────────────────────────────────
 function SpecialtySearch({ value, onChange, onSelect, supabaseUrl, supabaseKey }) {
   const [suggestions, setSuggestions] = useState([]);
@@ -20,18 +17,11 @@ function SpecialtySearch({ value, onChange, onSelect, supabaseUrl, supabaseKey }
     if (!term || term.length < 2) { setSuggestions([]); return; }
     setLoading(true);
     try {
-      const res = await fetch(
-        `${supabaseUrl}/rest/v1/rpc/get_specialties`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-          },
-          body: JSON.stringify({ search_term: term }),
-        }
-      );
+      const res = await fetch(`${supabaseUrl}/rest/v1/rpc/get_specialties`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` },
+        body: JSON.stringify({ search_term: term }),
+      });
       const data = await res.json();
       setSuggestions(data || []);
       setShowSuggestions(true);
@@ -57,46 +47,26 @@ function SpecialtySearch({ value, onChange, onSelect, supabaseUrl, supabaseKey }
   }
 
   function handleKeyDown(e) {
-    if (e.key === 'Escape') { setShowSuggestions(false); }
+    if (e.key === 'Escape') setShowSuggestions(false);
     if (e.key === 'Enter') { setShowSuggestions(false); onSelect(value); }
   }
 
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ position: 'relative' }}>
-        <input
-          ref={inputRef}
-          value={value}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
+        <input ref={inputRef} value={value} onChange={handleChange} onKeyDown={handleKeyDown}
           onFocus={() => value.length >= 2 && setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           placeholder="Type a specialty or condition..."
-          style={{
-            width: '100%', padding: '0.55rem 2rem 0.55rem 0.8rem',
-            border: `1.5px solid ${C.sky}`, borderRadius: 8,
-            fontFamily: 'inherit', fontSize: 13, outline: 'none',
-            background: 'white', boxSizing: 'border-box',
-          }}
+          style={{ width: '100%', padding: '0.55rem 2rem 0.55rem 0.8rem', border: `1.5px solid ${C.sky}`, borderRadius: 8, fontFamily: 'inherit', fontSize: 13, outline: 'none', background: 'white', boxSizing: 'border-box' }}
         />
-        {loading && (
-          <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, border: `2px solid rgba(26,107,138,0.2)`, borderTopColor: C.ocean, borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
-        )}
+        {loading && <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, border: `2px solid rgba(26,107,138,0.2)`, borderTopColor: C.ocean, borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />}
       </div>
       {showSuggestions && suggestions.length > 0 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 500,
-          background: 'white', border: `1.5px solid ${C.border}`,
-          borderRadius: 8, boxShadow: '0 8px 24px rgba(13,61,82,0.12)',
-          marginTop: 4, maxHeight: 280, overflowY: 'auto',
-        }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 500, background: 'white', border: `1.5px solid ${C.border}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(13,61,82,0.12)', marginTop: 4, maxHeight: 280, overflowY: 'auto' }}>
           {suggestions.map((s, i) => (
-            <div key={i} onMouseDown={() => handleSelect(s.specialty)} style={{
-              padding: '0.6rem 0.9rem', cursor: 'pointer', fontSize: 13,
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              borderBottom: i < suggestions.length - 1 ? `1px solid ${C.border}` : 'none',
-              transition: 'background 0.1s',
-            }}
+            <div key={i} onMouseDown={() => handleSelect(s.specialty)}
+              style={{ padding: '0.6rem 0.9rem', cursor: 'pointer', fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: i < suggestions.length - 1 ? `1px solid ${C.border}` : 'none' }}
               onMouseEnter={e => e.currentTarget.style.background = '#f0f8fb'}
               onMouseLeave={e => e.currentTarget.style.background = 'white'}
             >
@@ -136,13 +106,15 @@ function Spinner() {
   );
 }
 
-function DoctorCard({ doc, isMobile }) {
+function DoctorCard({ doc, isMobile, highlighted, onHover }) {
   const navigate = useNavigate();
   const initials = doc.name.replace(/Dr\.\s*/, "").split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   return (
-    <div onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })} style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 14, padding: isMobile ? "1rem" : "1.1rem 1.3rem", marginBottom: "0.75rem", cursor: "pointer", transition: "box-shadow 0.2s, transform 0.2s" }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(13,61,82,0.1)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "none"; }}
+    <div
+      onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })}
+      onMouseEnter={() => onHover && onHover(doc.npi)}
+      onMouseLeave={() => onHover && onHover(null)}
+      style={{ background: "white", border: `1.5px solid ${highlighted ? C.ocean : C.border}`, borderRadius: 14, padding: isMobile ? "1rem" : "1.1rem 1.3rem", marginBottom: "0.75rem", cursor: "pointer", transition: "box-shadow 0.2s, transform 0.2s, border-color 0.2s", boxShadow: highlighted ? `0 6px 20px rgba(26,107,138,0.15)` : "none", transform: highlighted ? "translateY(-2px)" : "none" }}
     >
       <div style={{ display: "flex", gap: "0.8rem", alignItems: "flex-start" }}>
         <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, background: `linear-gradient(135deg, ${C.sky}, ${C.ocean})`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 14 }}>{initials}</div>
@@ -180,23 +152,165 @@ function DoctorCard({ doc, isMobile }) {
   );
 }
 
+// ── SEARCH MAP ──────────────────────────────────────────────────────────────
+function SearchMap({ doctors, highlightedNpi, onMarkerHover }) {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef([]);
+  const infoWindowRef = useRef(null);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    function initMap() {
+      if (!window.google || !window.google.maps || !mapRef.current) return;
+
+      // Create map centered on San Diego
+      const map = new window.google.maps.Map(mapRef.current, {
+        zoom: 11,
+        center: { lat: 32.7157, lng: -117.1611 },
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_TOP },
+      });
+      mapInstanceRef.current = map;
+      infoWindowRef.current = new window.google.maps.InfoWindow();
+    }
+
+    if (window.google && window.google.maps) {
+      initMap();
+    } else {
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (window.google && window.google.maps) {
+          clearInterval(interval);
+          initMap();
+        } else if (attempts > 20) {
+          clearInterval(interval);
+        }
+      }, 250);
+      return () => clearInterval(interval);
+    }
+  }, []);
+
+  // Geocode and place markers when doctors change
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google || !doctors.length) return;
+
+    // Clear old markers
+    markersRef.current.forEach(m => m.setMap(null));
+    markersRef.current = [];
+
+    const geocoder = new window.google.maps.Geocoder();
+    const bounds = new window.google.maps.LatLngBounds();
+    let geocodedCount = 0;
+
+    doctors.forEach((doc, index) => {
+      if (!doc.address || !doc.city) return;
+      const fullAddress = `${doc.address}, ${doc.city}, CA`;
+
+      // Stagger geocode requests slightly to avoid hitting rate limits
+      setTimeout(() => {
+        geocoder.geocode({ address: fullAddress }, (results, status) => {
+          if (status !== "OK" || !results[0] || !mapInstanceRef.current) return;
+
+          const position = results[0].geometry.location;
+          bounds.extend(position);
+
+          const marker = new window.google.maps.Marker({
+            map: mapInstanceRef.current,
+            position,
+            title: doc.name,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 9,
+              fillColor: doc.verified ? C.dusk : C.ocean,
+              fillOpacity: 1,
+              strokeColor: "white",
+              strokeWeight: 2,
+            },
+            label: {
+              text: String(index + 1),
+              color: "white",
+              fontSize: "10px",
+              fontWeight: "bold",
+            },
+          });
+
+          marker._npi = doc.npi;
+
+          marker.addListener("click", () => {
+            if (infoWindowRef.current) {
+              infoWindowRef.current.setContent(`
+                <div style="font-family: system-ui, sans-serif; padding: 4px; min-width: 160px;">
+                  <div style="font-weight: 700; color: #0d3d52; font-size: 13px; margin-bottom: 2px;">${doc.name}</div>
+                  <div style="color: #1a6b8a; font-size: 12px; margin-bottom: 4px;">${doc.specialty}</div>
+                  <div style="color: #6b8f99; font-size: 11px;">${doc.address}, ${doc.city}</div>
+                  ${doc.accepting === true ? '<div style="color: #1a7a4a; font-size: 11px; margin-top: 4px;">✅ Accepting patients</div>' : ''}
+                </div>
+              `);
+              infoWindowRef.current.open(mapInstanceRef.current, marker);
+            }
+            if (onMarkerHover) onMarkerHover(doc.npi);
+          });
+
+          marker.addListener("mouseover", () => {
+            if (onMarkerHover) onMarkerHover(doc.npi);
+          });
+          marker.addListener("mouseout", () => {
+            if (onMarkerHover) onMarkerHover(null);
+          });
+
+          markersRef.current.push(marker);
+          geocodedCount++;
+
+          // Fit map to all markers once we have a few
+          if (geocodedCount >= Math.min(doctors.length, 3)) {
+            mapInstanceRef.current.fitBounds(bounds);
+            const listener = mapInstanceRef.current.addListener("idle", () => {
+              if (mapInstanceRef.current.getZoom() > 13) mapInstanceRef.current.setZoom(13);
+              window.google.maps.event.removeListener(listener);
+            });
+          }
+        });
+      }, index * 100);
+    });
+  }, [doctors]);
+
+  // Highlight marker when card is hovered
+  useEffect(() => {
+    markersRef.current.forEach(marker => {
+      const isHighlighted = marker._npi === highlightedNpi;
+      marker.setIcon({
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: isHighlighted ? 12 : 9,
+        fillColor: isHighlighted ? C.dusk : C.ocean,
+        fillOpacity: 1,
+        strokeColor: "white",
+        strokeWeight: 2,
+      });
+      marker.setZIndex(isHighlighted ? 999 : 1);
+    });
+  }, [highlightedNpi]);
+
+  return (
+    <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 12 }} />
+  );
+}
+
 function FilterPanel({ specialtySearch, setSpecialtySearch, neighborhood, setNeighborhood, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
   const sel = { width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Specialty</div>
-        <SpecialtySearch
-          value={specialtySearch}
-          onChange={setSpecialtySearch}
-          onSelect={(s) => { setSpecialtySearch(s); onSearch(); }}
-          supabaseUrl={SUPABASE_URL}
-          supabaseKey={SUPABASE_ANON_KEY}
-        />
+        <SpecialtySearch value={specialtySearch} onChange={setSpecialtySearch} onSelect={(s) => { setSpecialtySearch(s); onSearch(); }} supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_ANON_KEY} />
       </div>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Neighborhood</div>
-        <select value={neighborhood} onChange={e => { setNeighborhood(e.target.value); }} style={sel}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
+        <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} style={sel}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
       </div>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Gender</div>
@@ -228,6 +342,17 @@ function FilterPanel({ specialtySearch, setSpecialtySearch, neighborhood, setNei
   );
 }
 
+// Smart sort: verified first, then accepting, then alphabetical
+function smartSort(results) {
+  return [...results].sort((a, b) => {
+    if (a.verified && !b.verified) return -1;
+    if (!a.verified && b.verified) return 1;
+    if (a.accepting === true && b.accepting !== true) return -1;
+    if (a.accepting !== true && b.accepting === true) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export default function Search() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -241,13 +366,15 @@ export default function Search() {
   const [accepting, setAccepting] = useState(false);
   const [telehealth, setTelehealth] = useState(false);
   const [selectedLangs, setSelectedLangs] = useState([]);
-  const [sort, setSort] = useState("name");
+  const [sort, setSort] = useState("smart");
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
+  const [showMap, setShowMap] = useState(true);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const perPage = 10;
+  const [highlightedNpi, setHighlightedNpi] = useState(null);
+  const perPage = 20;
 
   const fetchDoctors = useCallback(async () => {
     setLoading(true); setError(""); setResults([]); setPage(1);
@@ -262,34 +389,49 @@ export default function Search() {
       if (!res.ok) throw new Error(data.error || "Search failed");
       let filtered = data.results || [];
       if (gender) filtered = filtered.filter(d => d.gender === gender);
-      if (sort === "name") filtered.sort((a, b) => a.name.localeCompare(b.name));
-      if (sort === "city") filtered.sort((a, b) => a.city.localeCompare(b.city));
+      if (accepting) filtered = filtered.filter(d => d.accepting === true);
+      if (telehealth) filtered = filtered.filter(d => d.telehealth === true);
+      if (selectedLangs.length > 0) filtered = filtered.filter(d => selectedLangs.some(l => d.languages?.includes(l)));
       setResults(filtered);
     } catch (e) {
       setError(e.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [query, neighborhood, specialtySearch, gender, sort]);
+  }, [query, neighborhood, specialtySearch, gender, accepting, telehealth, selectedLangs]);
 
   useEffect(() => { fetchDoctors(); }, []);
 
-  const totalPages = Math.ceil(results.length / perPage);
-  const pageData = results.slice((page - 1) * perPage, page * perPage);
+  // Apply sort
+  const sortedResults = sort === "smart" ? smartSort(results)
+    : sort === "name" ? [...results].sort((a, b) => a.name.localeCompare(b.name))
+    : sort === "city" ? [...results].sort((a, b) => a.city.localeCompare(b.city))
+    : results;
+
+  const totalPages = Math.ceil(sortedResults.length / perPage);
+  const pageData = sortedResults.slice((page - 1) * perPage, page * perPage);
   const activeFilterCount = [specialtySearch !== "", gender !== "", accepting, telehealth, neighborhood !== "All of San Diego", selectedLangs.length > 0].filter(Boolean).length;
 
   function clearAll() { setQuery(""); setSpecialtySearch(""); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
 
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", background: C.bg, minHeight: "100vh" }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* NAV */}
       <nav style={{ position: "sticky", top: 0, zIndex: 200, background: "rgba(253,250,245,0.97)", backdropFilter: "blur(12px)", borderBottom: `1px solid rgba(26,107,138,0.12)`, padding: isMobile ? "0.75rem 1rem" : "0.8rem 1.2rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: isMobile ? "0.6rem" : 0 }}>
           <div onClick={() => navigate("/")} style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 17 : 19, color: C.ocean, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Your Doctor <span style={{ color: C.dusk }}>SD</span></div>
           {!isMobile && (
-            <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
-              <span style={{ fontSize: 15, color: C.muted, fontStyle: "italic", letterSpacing: "0.01em" }}>
-                Finding care, made simple.
-              </span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 15, color: C.muted, fontStyle: "italic" }}>Finding care, made simple.</span>
+              {/* Map toggle - desktop */}
+              <button
+                onClick={() => setShowMap(m => !m)}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: showMap ? C.ocean : "white", color: showMap ? "white" : C.ocean, border: `1.5px solid ${C.ocean}`, padding: "0.4rem 0.9rem", borderRadius: 8, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+              >
+                🗺️ {showMap ? "Hide Map" : "Show Map"}
+              </button>
             </div>
           )}
         </div>
@@ -304,6 +446,7 @@ export default function Search() {
         )}
       </nav>
 
+      {/* Mobile filter drawer */}
       {isMobile && showFilters && <>
         <div onClick={() => setShowFilters(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 300 }} />
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 400, background: "white", borderRadius: "20px 20px 0 0", padding: "1.5rem 1.2rem 2rem", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 -8px 30px rgba(0,0,0,0.15)" }}>
@@ -311,12 +454,14 @@ export default function Search() {
             <div style={{ fontWeight: 700, fontSize: 17, color: C.deep }}>Filter Doctors</div>
             <button onClick={() => setShowFilters(false)} style={{ background: "#f0f4f5", border: "none", borderRadius: "50%", width: 32, height: 32, fontSize: 16, cursor: "pointer" }}>✕</button>
           </div>
-
           <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} neighborhood={neighborhood} setNeighborhood={n => { setNeighborhood(n); setPage(1); }} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} isMobile />
         </div>
       </>}
 
-      <div style={{ maxWidth: 1050, margin: "0 auto", padding: isMobile ? "1rem" : "1.2rem 1.2rem 3rem", display: "flex", gap: "1.2rem", alignItems: "flex-start" }}>
+      {/* MAIN CONTENT */}
+      <div style={{ maxWidth: showMap && !isMobile ? 1400 : 1050, margin: "0 auto", padding: isMobile ? "1rem" : "1.2rem 1.2rem 3rem", display: "flex", gap: "1.2rem", alignItems: "flex-start" }}>
+
+        {/* Filter sidebar */}
         {!isMobile && (
           <aside style={{ width: 200, flexShrink: 0 }}>
             <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "1.1rem", position: "sticky", top: 72 }}>
@@ -326,14 +471,17 @@ export default function Search() {
             </div>
           </aside>
         )}
+
+        {/* Results list */}
         <main style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <div style={{ fontSize: 13, color: C.muted }}>
               {loading ? "Searching NPI registry…" : error ? "" : results.length > 0
-                ? <span>Showing <strong style={{ color: C.deep }}>{(page-1)*perPage+1}–{Math.min(page*perPage,results.length)}</strong> of <strong style={{ color: C.deep }}>{results.length}</strong> licensed San Diego providers</span>
+                ? <span>Showing <strong style={{ color: C.deep }}>{(page - 1) * perPage + 1}–{Math.min(page * perPage, sortedResults.length)}</strong> of <strong style={{ color: C.deep }}>{sortedResults.length}</strong> licensed San Diego providers</span>
                 : "No providers found — try a different specialty"}
             </div>
             <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }} style={{ padding: "0.4rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 7, fontFamily: "inherit", fontSize: 12, background: "white", outline: "none", appearance: "none" }}>
+              <option value="smart">Sort: Best Match</option>
               <option value="name">Sort: Name A–Z</option>
               <option value="city">Sort: City</option>
             </select>
@@ -356,20 +504,57 @@ export default function Search() {
               <button onClick={clearAll} style={{ marginTop: 14, background: C.ocean, color: "white", border: "none", padding: "0.6rem 1.4rem", borderRadius: 8, cursor: "pointer", fontFamily: "inherit" }}>Clear Filters</button>
             </div>
           )}
-          {!loading && !error && pageData.map((doc, i) => <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} />)}
+          {!loading && !error && pageData.map((doc, i) => (
+            <DoctorCard
+              key={doc.npi || i}
+              doc={doc}
+              isMobile={isMobile}
+              highlighted={highlightedNpi === doc.npi}
+              onHover={setHighlightedNpi}
+            />
+          ))}
           {totalPages > 1 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 20, flexWrap: "wrap" }}>
-              <button onClick={() => { setPage(p => Math.max(1,p-1)); window.scrollTo(0,0); }} disabled={page===1} style={{ padding: "7px 14px", border: `1.5px solid ${C.border}`, borderRadius: 8, background: "white", cursor: page===1?"default":"pointer", opacity: page===1?0.4:1, fontSize: 13 }}>← Prev</button>
-              {Array.from({length:totalPages},(_,i)=>i+1).map(p=>(
-                <button key={p} onClick={() => { setPage(p); window.scrollTo(0,0); }} style={{ padding: "7px 13px", border: `1.5px solid ${p===page?C.ocean:C.border}`, borderRadius: 8, background: p===page?C.ocean:"white", color: p===page?"white":C.text, cursor: "pointer", fontSize: 13, fontWeight: p===page?600:400 }}>{p}</button>
-              ))}
-              <button onClick={() => { setPage(p => Math.min(totalPages,p+1)); window.scrollTo(0,0); }} disabled={page===totalPages} style={{ padding: "7px 14px", border: `1.5px solid ${C.border}`, borderRadius: 8, background: "white", cursor: page===totalPages?"default":"pointer", opacity: page===totalPages?0.4:1, fontSize: 13 }}>Next →</button>
+              <button onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }} disabled={page === 1} style={{ padding: "7px 14px", border: `1.5px solid ${C.border}`, borderRadius: 8, background: "white", cursor: page === 1 ? "default" : "pointer", opacity: page === 1 ? 0.4 : 1, fontSize: 13 }}>← Prev</button>
+              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                const p = page <= 4 ? i + 1 : page - 3 + i;
+                if (p < 1 || p > totalPages) return null;
+                return <button key={p} onClick={() => { setPage(p); window.scrollTo(0, 0); }} style={{ padding: "7px 13px", border: `1.5px solid ${p === page ? C.ocean : C.border}`, borderRadius: 8, background: p === page ? C.ocean : "white", color: p === page ? "white" : C.text, cursor: "pointer", fontSize: 13, fontWeight: p === page ? 600 : 400 }}>{p}</button>;
+              })}
+              <button onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 0); }} disabled={page === totalPages} style={{ padding: "7px 14px", border: `1.5px solid ${C.border}`, borderRadius: 8, background: "white", cursor: page === totalPages ? "default" : "pointer", opacity: page === totalPages ? 0.4 : 1, fontSize: 13 }}>Next →</button>
             </div>
           )}
           {!loading && results.length > 0 && (
             <div style={{ fontSize: 11, color: "#9ab5bf", textAlign: "center", marginTop: 16 }}>Data sourced live from the National Provider Index (NPPES). NPI does not confirm licensure.</div>
           )}
         </main>
+
+        {/* Map panel - desktop only */}
+        {!isMobile && showMap && (
+          <div style={{ width: 420, flexShrink: 0, position: "sticky", top: 72, height: "calc(100vh - 90px)" }}>
+            <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 14, overflow: "hidden", height: "100%" }}>
+              <div style={{ padding: "0.7rem 1rem", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.deep }}>📍 Showing {pageData.length} providers on map</span>
+                <span style={{ fontSize: 11, color: C.muted }}>Page {page} of {totalPages || 1}</span>
+              </div>
+              <div style={{ height: "calc(100% - 44px)" }}>
+                {!loading && pageData.length > 0 && (
+                  <SearchMap
+                    doctors={pageData}
+                    highlightedNpi={highlightedNpi}
+                    onMarkerHover={setHighlightedNpi}
+                  />
+                )}
+                {(loading || pageData.length === 0) && (
+                  <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted, gap: 8 }}>
+                    <span style={{ fontSize: 32 }}>🗺️</span>
+                    <span style={{ fontSize: 13 }}>{loading ? "Loading results…" : "Search to see providers on map"}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
