@@ -5,12 +5,10 @@ import { NEIGHBORHOODS, ALL_LANGUAGES, COLORS as C } from "../data/doctors";
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
 
-// ── SPECIALTY AUTOCOMPLETE ──────────────────────────────────────────────────
 function SpecialtySearch({ value, onChange, onSelect, supabaseUrl, supabaseKey }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef(null);
   const debounceRef = useRef(null);
 
   async function fetchSuggestions(term) {
@@ -25,11 +23,7 @@ function SpecialtySearch({ value, onChange, onSelect, supabaseUrl, supabaseKey }
       const data = await res.json();
       setSuggestions(data || []);
       setShowSuggestions(true);
-    } catch (e) {
-      setSuggestions([]);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setSuggestions([]); } finally { setLoading(false); }
   }
 
   function handleChange(e) {
@@ -40,21 +34,14 @@ function SpecialtySearch({ value, onChange, onSelect, supabaseUrl, supabaseKey }
   }
 
   function handleSelect(specialty) {
-    onChange(specialty);
-    setSuggestions([]);
-    setShowSuggestions(false);
-    onSelect(specialty);
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === 'Escape') setShowSuggestions(false);
-    if (e.key === 'Enter') { setShowSuggestions(false); onSelect(value); }
+    onChange(specialty); setSuggestions([]); setShowSuggestions(false); onSelect(specialty);
   }
 
   return (
     <div style={{ position: 'relative' }}>
       <div style={{ position: 'relative' }}>
-        <input ref={inputRef} value={value} onChange={handleChange} onKeyDown={handleKeyDown}
+        <input value={value} onChange={handleChange}
+          onKeyDown={e => { if (e.key === 'Escape') setShowSuggestions(false); if (e.key === 'Enter') { setShowSuggestions(false); onSelect(value); } }}
           onFocus={() => value.length >= 2 && setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           placeholder="Type a specialty or condition..."
@@ -110,9 +97,7 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
   const navigate = useNavigate();
   const initials = doc.name.replace(/Dr\.\s*/, "").split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   return (
-    <div
-      ref={cardRef}
-      onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })}
+    <div ref={cardRef} onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })}
       onMouseEnter={() => onHover && onHover(doc.npi)}
       onMouseLeave={() => onHover && onHover(null)}
       style={{ background: "white", border: `1.5px solid ${highlighted ? C.ocean : C.border}`, borderRadius: 14, padding: isMobile ? "1rem" : "1.1rem 1.3rem", marginBottom: "0.75rem", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.15s", boxShadow: highlighted ? `0 4px 16px rgba(26,107,138,0.13)` : "none" }}
@@ -160,7 +145,6 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
 
-  // Init map once
   useEffect(() => {
     function initMap() {
       if (!mapRef.current || !window.google?.maps) return;
@@ -187,7 +171,6 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
     }
   }, []);
 
-  // Geocode ALL doctors first, then place all markers, then fitBounds ONCE with no idle listener
   useEffect(() => {
     if (!mapInstanceRef.current || !window.google?.maps || !doctors.length) return;
 
@@ -200,8 +183,14 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
     let completed = 0;
 
     function placeAllMarkers() {
-      const bounds = new window.google.maps.LatLngBounds();
       const valid = geocodeResults.filter(Boolean);
+      if (!valid.length) return;
+
+      // Calculate center manually — NO fitBounds, NO idle listener
+      const avgLat = valid.reduce((sum, r) => sum + r.position.lat(), 0) / valid.length;
+      const avgLng = valid.reduce((sum, r) => sum + r.position.lng(), 0) / valid.length;
+      mapInstanceRef.current.setCenter({ lat: avgLat, lng: avgLng });
+      mapInstanceRef.current.setZoom(12);
 
       valid.forEach(({ doc, position, index }) => {
         const marker = new window.google.maps.Marker({
@@ -216,18 +205,14 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
             strokeColor: "white",
             strokeWeight: 2,
           },
-          label: {
-            text: String(index + 1),
-            color: "white",
-            fontSize: "10px",
-            fontWeight: "bold",
-          },
+          label: { text: String(index + 1), color: "white", fontSize: "10px", fontWeight: "bold" },
         });
 
         marker._npi = doc.npi;
 
         marker.addListener("click", () => {
-          mapInstanceRef.current.panTo(position);
+          // Direct set — no animation, no async, nothing can override this
+          mapInstanceRef.current.setCenter(position);
           mapInstanceRef.current.setZoom(15);
 
           if (infoWindowRef.current) {
@@ -245,13 +230,7 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
         });
 
         markersRef.current.push(marker);
-        bounds.extend(position);
       });
-
-      // fitBounds with padding — no idle listener, no zoom cap
-      if (valid.length > 0) {
-        mapInstanceRef.current.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-      }
     }
 
     toGeocode.forEach((doc, index) => {
@@ -261,15 +240,12 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
             geocodeResults[index] = { doc, position: results[0].geometry.location, index };
           }
           completed++;
-          if (completed === toGeocode.length) {
-            placeAllMarkers();
-          }
+          if (completed === toGeocode.length) placeAllMarkers();
         });
       }, index * 80);
     });
   }, [doctors]);
 
-  // Highlight marker color on hover
   useEffect(() => {
     if (!window.google?.maps) return;
     markersRef.current.forEach(marker => {
