@@ -5,6 +5,39 @@ import { NEIGHBORHOODS, ALL_LANGUAGES, COLORS as C } from "../data/doctors";
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
 
+// Approximate centers for SD neighborhoods for map zooming
+const NEIGHBORHOOD_COORDS = {
+  "All of San Diego": { lat: 32.8, lng: -117.1, zoom: 10 },
+  "San Diego": { lat: 32.7157, lng: -117.1611, zoom: 12 },
+  "Chula Vista": { lat: 32.6401, lng: -117.0842, zoom: 13 },
+  "Oceanside": { lat: 33.1959, lng: -117.3795, zoom: 13 },
+  "Escondido": { lat: 33.1192, lng: -117.0864, zoom: 13 },
+  "El Cajon": { lat: 32.7948, lng: -116.9625, zoom: 13 },
+  "Santee": { lat: 32.8384, lng: -116.9739, zoom: 13 },
+  "La Mesa": { lat: 32.7678, lng: -117.0228, zoom: 13 },
+  "National City": { lat: 32.6781, lng: -117.0992, zoom: 13 },
+  "Poway": { lat: 32.9628, lng: -117.0359, zoom: 13 },
+  "Vista": { lat: 33.2000, lng: -117.2425, zoom: 13 },
+  "San Marcos": { lat: 33.1434, lng: -117.1661, zoom: 13 },
+  "Carlsbad": { lat: 33.1581, lng: -117.3506, zoom: 13 },
+  "Encinitas": { lat: 33.0369, lng: -117.2920, zoom: 13 },
+  "Solana Beach": { lat: 32.9912, lng: -117.2712, zoom: 13 },
+  "Del Mar": { lat: 32.9595, lng: -117.2653, zoom: 13 },
+  "La Jolla": { lat: 32.8328, lng: -117.2713, zoom: 13 },
+  "Pacific Beach": { lat: 32.7965, lng: -117.2358, zoom: 13 },
+  "Mission Valley": { lat: 32.7674, lng: -117.1485, zoom: 13 },
+  "Hillcrest": { lat: 32.7467, lng: -117.1600, zoom: 14 },
+  "North Park": { lat: 32.7478, lng: -117.1298, zoom: 14 },
+  "Kearny Mesa": { lat: 32.8200, lng: -117.1500, zoom: 13 },
+  "Mira Mesa": { lat: 32.9120, lng: -117.1484, zoom: 13 },
+  "Rancho Bernardo": { lat: 33.0120, lng: -117.0700, zoom: 13 },
+  "Rancho Santa Fe": { lat: 33.0234, lng: -117.1987, zoom: 13 },
+  "Spring Valley": { lat: 32.7448, lng: -116.9989, zoom: 13 },
+  "Lemon Grove": { lat: 32.7248, lng: -117.0314, zoom: 13 },
+  "Alpine": { lat: 32.8351, lng: -116.7664, zoom: 13 },
+  "Lakeside": { lat: 32.8576, lng: -116.9225, zoom: 13 },
+};
+
 function SpecialtySearch({ value, onChange, onSelect, supabaseUrl, supabaseKey }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -148,16 +181,14 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
   );
 }
 
-// SearchMap is memoized and only re-renders when doctors array reference changes.
-// Highlight is done imperatively via highlightFnRef — zero React renders on hover/click.
-const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef }) {
+const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef, mapViewFnRef }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
   const prevNpiRef = useRef(null);
 
-  // Register imperative highlight function — called directly, no state update
+  // Imperative highlight — no re-render
   highlightFnRef.current = (npi) => {
     if (!window.google?.maps) return;
     if (prevNpiRef.current) {
@@ -175,6 +206,13 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef 
       }
     }
     prevNpiRef.current = npi;
+  };
+
+  // Imperative map view change — no re-render
+  mapViewFnRef.current = ({ lat, lng, zoom }) => {
+    if (!mapInstanceRef.current) return;
+    mapInstanceRef.current.panTo({ lat, lng });
+    mapInstanceRef.current.setZoom(zoom);
   };
 
   useEffect(() => {
@@ -208,8 +246,6 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef 
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
     prevNpiRef.current = null;
-    mapInstanceRef.current.setCenter({ lat: 32.8, lng: -117.1 });
-    mapInstanceRef.current.setZoom(10);
 
     const geocoder = new window.google.maps.Geocoder();
     doctors.forEach((doc, index) => {
@@ -249,7 +285,7 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef 
   return <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 12 }} />;
 });
 
-function FilterPanel({ specialtySearch, setSpecialtySearch, neighborhood, setNeighborhood, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
+function FilterPanel({ specialtySearch, setSpecialtySearch, neighborhood, setNeighborhood, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, onNeighborhoodChange, isMobile }) {
   const sel = { width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -259,7 +295,10 @@ function FilterPanel({ specialtySearch, setSpecialtySearch, neighborhood, setNei
       </div>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Neighborhood</div>
-        <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} style={sel}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
+        <select value={neighborhood} onChange={e => {
+          setNeighborhood(e.target.value);
+          if (onNeighborhoodChange) onNeighborhoodChange(e.target.value);
+        }} style={sel}>{NEIGHBORHOODS.map(n => <option key={n}>{n}</option>)}</select>
       </div>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Gender</div>
@@ -324,6 +363,7 @@ export default function Search() {
   const [highlightedNpi, setHighlightedNpi] = useState(null);
   const cardRefs = useRef({});
   const highlightFnRef = useRef(null);
+  const mapViewFnRef = useRef(null);
   const perPage = 20;
 
   const fetchDoctors = useCallback(async () => {
@@ -365,7 +405,20 @@ export default function Search() {
     }, 50);
   }
 
-  // Stable sorted results — only recalculates when results or sort changes
+  // When neighborhood changes, zoom the map to that area immediately
+  function handleNeighborhoodChange(name) {
+    setPage(1);
+    const coords = NEIGHBORHOOD_COORDS[name] || NEIGHBORHOOD_COORDS["All of San Diego"];
+    if (mapViewFnRef.current) mapViewFnRef.current(coords);
+  }
+
+  // Clear all filters and reset map to full SD view
+  function clearAll() {
+    setQuery(""); setSpecialtySearch(""); setNeighborhood("All of San Diego");
+    setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1);
+    if (mapViewFnRef.current) mapViewFnRef.current(NEIGHBORHOOD_COORDS["All of San Diego"]);
+  }
+
   const sortedResults = useMemo(() => {
     if (sort === "smart") return smartSort(results);
     if (sort === "name") return [...results].sort((a, b) => a.name.localeCompare(b.name));
@@ -373,16 +426,12 @@ export default function Search() {
     return results;
   }, [results, sort]);
 
-  // Stable page slice — only recalculates when sortedResults or page changes
-  // This is the key fix: memo() on SearchMap only works if doctors prop is stable
   const pageData = useMemo(() => {
     return sortedResults.slice((page - 1) * perPage, page * perPage);
   }, [sortedResults, page]);
 
   const totalPages = Math.ceil(sortedResults.length / perPage);
   const activeFilterCount = [specialtySearch !== "", gender !== "", accepting, telehealth, neighborhood !== "All of San Diego", selectedLangs.length > 0].filter(Boolean).length;
-
-  function clearAll() { setQuery(""); setSpecialtySearch(""); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
 
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", background: C.bg, minHeight: "100vh" }}>
@@ -418,7 +467,7 @@ export default function Search() {
             <div style={{ fontWeight: 700, fontSize: 17, color: C.deep }}>Filter Doctors</div>
             <button onClick={() => setShowFilters(false)} style={{ background: "#f0f4f5", border: "none", borderRadius: "50%", width: 32, height: 32, fontSize: 16, cursor: "pointer" }}>✕</button>
           </div>
-          <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} neighborhood={neighborhood} setNeighborhood={n => { setNeighborhood(n); setPage(1); }} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} isMobile />
+          <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} neighborhood={neighborhood} setNeighborhood={setNeighborhood} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={() => { clearAll(); setShowFilters(false); }} onApply={() => setShowFilters(false)} onSearch={fetchDoctors} onNeighborhoodChange={handleNeighborhoodChange} isMobile />
         </div>
       </>}
 
@@ -427,7 +476,7 @@ export default function Search() {
           <aside style={{ width: 200, flexShrink: 0 }}>
             <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "1.1rem", position: "sticky", top: 72 }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 14 }}>Filters</div>
-              <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} neighborhood={neighborhood} setNeighborhood={n => { setNeighborhood(n); setPage(1); }} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={clearAll} onSearch={fetchDoctors} isMobile={false} />
+              <FilterPanel specialtySearch={specialtySearch} setSpecialtySearch={setSpecialtySearch} neighborhood={neighborhood} setNeighborhood={setNeighborhood} gender={gender} setGender={setGender} accepting={accepting} setAccepting={setAccepting} telehealth={telehealth} setTelehealth={setTelehealth} selectedLangs={selectedLangs} setSelectedLangs={setSelectedLangs} onClear={clearAll} onSearch={fetchDoctors} onNeighborhoodChange={handleNeighborhoodChange} isMobile={false} />
               <button onClick={fetchDoctors} style={{ width: "100%", marginTop: 10, background: C.ocean, color: "white", border: "none", padding: "0.6rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Apply Filters</button>
             </div>
           </aside>
@@ -496,6 +545,7 @@ export default function Search() {
                     doctors={pageData}
                     onPinClick={handlePinClick}
                     highlightFnRef={highlightFnRef}
+                    mapViewFnRef={mapViewFnRef}
                   />
                 ) : (
                   <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted, gap: 8 }}>
