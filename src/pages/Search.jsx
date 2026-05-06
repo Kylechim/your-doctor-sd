@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { NEIGHBORHOODS, ALL_LANGUAGES, COLORS as C } from "../data/doctors";
 
@@ -149,40 +149,37 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
 }
 
 // ── SEARCH MAP ──────────────────────────────────────────────────────────────
-// Key design: marker highlighting is done imperatively via a callback ref,
-// NOT through React state/useEffect — so changing highlight never causes a re-render
-// or flicker of the map markers.
-function SearchMap({ doctors, onPinClick, onHighlightChange }) {
+// memo() ensures this component NEVER re-renders due to parent state changes.
+// doctors prop changes (new search) will still trigger the internal useEffect.
+// Highlighting is done imperatively via the highlightFnRef — zero React renders.
+const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
-  const prevHighlightedRef = useRef(null);
+  const prevNpiRef = useRef(null);
 
-  // Expose highlight function to parent via callback
-  useEffect(() => {
-    if (onHighlightChange) {
-      onHighlightChange((npi) => {
-        // Unhighlight previous
-        if (prevHighlightedRef.current) {
-          const prev = markersRef.current.find(m => m._npi === prevHighlightedRef.current);
-          if (prev && window.google?.maps) {
-            prev.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2 });
-            prev.setZIndex(undefined);
-          }
-        }
-        // Highlight new
-        if (npi) {
-          const marker = markersRef.current.find(m => m._npi === npi);
-          if (marker && window.google?.maps) {
-            marker.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 11, fillColor: "#e8622a", fillOpacity: 1, strokeColor: "white", strokeWeight: 3 });
-            marker.setZIndex(999);
-          }
-        }
-        prevHighlightedRef.current = npi;
-      });
+  // Register the imperative highlight function on the ref
+  highlightFnRef.current = (npi) => {
+    if (!window.google?.maps) return;
+    // Unhighlight previous marker
+    if (prevNpiRef.current) {
+      const prev = markersRef.current.find(m => m._npi === prevNpiRef.current);
+      if (prev) {
+        prev.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2 });
+        prev.setZIndex(undefined);
+      }
     }
-  }, [onHighlightChange]);
+    // Highlight new marker
+    if (npi) {
+      const next = markersRef.current.find(m => m._npi === npi);
+      if (next) {
+        next.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 11, fillColor: "#e8622a", fillOpacity: 1, strokeColor: "white", strokeWeight: 3 });
+        next.setZIndex(999);
+      }
+    }
+    prevNpiRef.current = npi;
+  };
 
   useEffect(() => {
     function initMap() {
@@ -215,7 +212,7 @@ function SearchMap({ doctors, onPinClick, onHighlightChange }) {
 
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
-    prevHighlightedRef.current = null;
+    prevNpiRef.current = null;
 
     mapInstanceRef.current.setCenter({ lat: 32.8, lng: -117.1 });
     mapInstanceRef.current.setZoom(10);
@@ -261,7 +258,7 @@ function SearchMap({ doctors, onPinClick, onHighlightChange }) {
   }, [doctors]);
 
   return <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 12 }} />;
-}
+});
 
 function FilterPanel({ specialtySearch, setSpecialtySearch, neighborhood, setNeighborhood, gender, setGender, accepting, setAccepting, telehealth, setTelehealth, selectedLangs, setSelectedLangs, onClear, onApply, onSearch, isMobile }) {
   const sel = { width: "100%", padding: "0.5rem 0.7rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 13, background: "#f8fbfc", outline: "none", appearance: "none" };
@@ -337,7 +334,7 @@ export default function Search() {
   const [error, setError] = useState("");
   const [highlightedNpi, setHighlightedNpi] = useState(null);
   const cardRefs = useRef({});
-  const mapHighlightFnRef = useRef(null); // holds the imperative highlight function from SearchMap
+  const highlightFnRef = useRef(null); // imperative marker highlight — no re-render
   const perPage = 20;
 
   const fetchDoctors = useCallback(async () => {
@@ -366,10 +363,10 @@ export default function Search() {
 
   useEffect(() => { fetchDoctors(); }, []);
 
-  // Called by card hover or pin click — updates both card highlight AND map marker directly
+  // Highlight both card (React state) and map marker (imperative, no re-render)
   function handleHighlight(npi) {
     setHighlightedNpi(npi);
-    if (mapHighlightFnRef.current) mapHighlightFnRef.current(npi);
+    if (highlightFnRef.current) highlightFnRef.current(npi);
   }
 
   function handlePinClick(npi) {
@@ -472,14 +469,7 @@ export default function Search() {
             </div>
           )}
           {!loading && !error && pageData.map((doc, i) => (
-            <DoctorCard
-              key={doc.npi || i}
-              doc={doc}
-              isMobile={isMobile}
-              highlighted={highlightedNpi === doc.npi}
-              onHover={handleHighlight}
-              cardRef={el => cardRefs.current[doc.npi] = el}
-            />
+            <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} highlighted={highlightedNpi === doc.npi} onHover={handleHighlight} cardRef={el => cardRefs.current[doc.npi] = el} />
           ))}
           {totalPages > 1 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 20, flexWrap: "wrap" }}>
@@ -509,7 +499,7 @@ export default function Search() {
                   <SearchMap
                     doctors={pageData}
                     onPinClick={handlePinClick}
-                    onHighlightChange={fn => { mapHighlightFnRef.current = fn; }}
+                    highlightFnRef={highlightFnRef}
                   />
                 ) : (
                   <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted, gap: 8 }}>
