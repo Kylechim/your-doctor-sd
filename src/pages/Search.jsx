@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, memo } from "react";
+import { useState, useEffect, useCallback, useRef, memo, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { NEIGHBORHOODS, ALL_LANGUAGES, COLORS as C } from "../data/doctors";
 
@@ -148,10 +148,8 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
   );
 }
 
-// ── SEARCH MAP ──────────────────────────────────────────────────────────────
-// memo() ensures this component NEVER re-renders due to parent state changes.
-// doctors prop changes (new search) will still trigger the internal useEffect.
-// Highlighting is done imperatively via the highlightFnRef — zero React renders.
+// SearchMap is memoized and only re-renders when doctors array reference changes.
+// Highlight is done imperatively via highlightFnRef — zero React renders on hover/click.
 const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -159,10 +157,9 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef 
   const infoWindowRef = useRef(null);
   const prevNpiRef = useRef(null);
 
-  // Register the imperative highlight function on the ref
+  // Register imperative highlight function — called directly, no state update
   highlightFnRef.current = (npi) => {
     if (!window.google?.maps) return;
-    // Unhighlight previous marker
     if (prevNpiRef.current) {
       const prev = markersRef.current.find(m => m._npi === prevNpiRef.current);
       if (prev) {
@@ -170,7 +167,6 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef 
         prev.setZIndex(undefined);
       }
     }
-    // Highlight new marker
     if (npi) {
       const next = markersRef.current.find(m => m._npi === npi);
       if (next) {
@@ -209,23 +205,19 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef 
 
   useEffect(() => {
     if (!mapInstanceRef.current || !window.google?.maps || !doctors.length) return;
-
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
     prevNpiRef.current = null;
-
     mapInstanceRef.current.setCenter({ lat: 32.8, lng: -117.1 });
     mapInstanceRef.current.setZoom(10);
 
     const geocoder = new window.google.maps.Geocoder();
-
     doctors.forEach((doc, index) => {
       if (!doc.address || !doc.city) return;
       setTimeout(() => {
         geocoder.geocode({ address: `${doc.address}, ${doc.city}, CA` }, (results, status) => {
           if (status !== "OK" || !results[0] || !mapInstanceRef.current) return;
           const position = results[0].geometry.location;
-
           const marker = new window.google.maps.Marker({
             map: mapInstanceRef.current,
             position,
@@ -233,9 +225,7 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef 
             icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2 },
             label: { text: String(index + 1), color: "white", fontSize: "10px", fontWeight: "bold" },
           });
-
           marker._npi = doc.npi;
-
           marker.addListener("click", () => {
             if (infoWindowRef.current && mapInstanceRef.current) {
               infoWindowRef.current.setContent(`
@@ -250,7 +240,6 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef 
             }
             if (onPinClick) onPinClick(doc.npi);
           });
-
           markersRef.current.push(marker);
         });
       }, index * 80);
@@ -334,7 +323,7 @@ export default function Search() {
   const [error, setError] = useState("");
   const [highlightedNpi, setHighlightedNpi] = useState(null);
   const cardRefs = useRef({});
-  const highlightFnRef = useRef(null); // imperative marker highlight — no re-render
+  const highlightFnRef = useRef(null);
   const perPage = 20;
 
   const fetchDoctors = useCallback(async () => {
@@ -363,7 +352,6 @@ export default function Search() {
 
   useEffect(() => { fetchDoctors(); }, []);
 
-  // Highlight both card (React state) and map marker (imperative, no re-render)
   function handleHighlight(npi) {
     setHighlightedNpi(npi);
     if (highlightFnRef.current) highlightFnRef.current(npi);
@@ -377,13 +365,21 @@ export default function Search() {
     }, 50);
   }
 
-  const sortedResults = sort === "smart" ? smartSort(results)
-    : sort === "name" ? [...results].sort((a, b) => a.name.localeCompare(b.name))
-    : sort === "city" ? [...results].sort((a, b) => a.city.localeCompare(b.city))
-    : results;
+  // Stable sorted results — only recalculates when results or sort changes
+  const sortedResults = useMemo(() => {
+    if (sort === "smart") return smartSort(results);
+    if (sort === "name") return [...results].sort((a, b) => a.name.localeCompare(b.name));
+    if (sort === "city") return [...results].sort((a, b) => a.city.localeCompare(b.city));
+    return results;
+  }, [results, sort]);
+
+  // Stable page slice — only recalculates when sortedResults or page changes
+  // This is the key fix: memo() on SearchMap only works if doctors prop is stable
+  const pageData = useMemo(() => {
+    return sortedResults.slice((page - 1) * perPage, page * perPage);
+  }, [sortedResults, page]);
 
   const totalPages = Math.ceil(sortedResults.length / perPage);
-  const pageData = sortedResults.slice((page - 1) * perPage, page * perPage);
   const activeFilterCount = [specialtySearch !== "", gender !== "", accepting, telehealth, neighborhood !== "All of San Diego", selectedLangs.length > 0].filter(Boolean).length;
 
   function clearAll() { setQuery(""); setSpecialtySearch(""); setNeighborhood("All of San Diego"); setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1); }
