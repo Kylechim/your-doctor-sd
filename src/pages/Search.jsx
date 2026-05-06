@@ -100,12 +100,22 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
     <div ref={cardRef} onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })}
       onMouseEnter={() => onHover && onHover(doc.npi)}
       onMouseLeave={() => onHover && onHover(null)}
-      style={{ background: "white", border: `1.5px solid ${highlighted ? C.ocean : C.border}`, borderRadius: 14, padding: isMobile ? "1rem" : "1.1rem 1.3rem", marginBottom: "0.75rem", cursor: "pointer", transition: "box-shadow 0.2s, border-color 0.15s", boxShadow: highlighted ? `0 4px 16px rgba(26,107,138,0.13)` : "none" }}
+      style={{
+        background: highlighted ? "#f0f8fb" : "white",
+        border: `${highlighted ? "2px" : "1.5px"} solid ${highlighted ? C.ocean : C.border}`,
+        borderRadius: 14,
+        padding: isMobile ? "1rem" : "1.1rem 1.3rem",
+        marginBottom: "0.75rem",
+        cursor: "pointer",
+        transition: "box-shadow 0.15s, border-color 0.15s, background 0.15s, transform 0.15s",
+        boxShadow: highlighted ? `0 6px 24px rgba(26,107,138,0.18)` : "none",
+        transform: highlighted ? "translateX(4px)" : "none",
+      }}
     >
       <div style={{ display: "flex", gap: "0.8rem", alignItems: "flex-start" }}>
-        <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, background: `linear-gradient(135deg, ${C.sky}, ${C.ocean})`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 14 }}>{initials}</div>
+        <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, background: highlighted ? `linear-gradient(135deg, ${C.ocean}, ${C.deep})` : `linear-gradient(135deg, ${C.sky}, ${C.ocean})`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 14, transition: "background 0.15s" }}>{initials}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, color: C.deep, fontSize: isMobile ? 14 : 15, lineHeight: 1.3 }}>{doc.name}</div>
+          <div style={{ fontWeight: 700, color: highlighted ? C.ocean : C.deep, fontSize: isMobile ? 14 : 15, lineHeight: 1.3, transition: "color 0.15s" }}>{doc.name}</div>
           <div style={{ color: C.ocean, fontSize: 12, fontWeight: 500, marginTop: 2 }}>{doc.specialty}</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>📍 {doc.city}, CA{doc.phone && doc.phone !== "Call for number" && <> &nbsp;·&nbsp; 📞 {doc.phone}</>}</div>
         </div>
@@ -145,12 +155,16 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
 
+  // San Diego county bounds — used as initial view, never changes on pin click
+  const SD_CENTER = { lat: 32.8, lng: -117.1 };
+  const SD_ZOOM = 10;
+
   useEffect(() => {
     function initMap() {
       if (!mapRef.current || !window.google?.maps) return;
       const map = new window.google.maps.Map(mapRef.current, {
-        zoom: 11,
-        center: { lat: 32.7157, lng: -117.1611 },
+        zoom: SD_ZOOM,
+        center: SD_CENTER,
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
@@ -177,82 +191,69 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
 
+    // Reset map to SD view when new doctors load
+    mapInstanceRef.current.setCenter(SD_CENTER);
+    mapInstanceRef.current.setZoom(SD_ZOOM);
+
     const geocoder = new window.google.maps.Geocoder();
     const toGeocode = doctors.filter(d => d.address && d.city);
-    const geocodeResults = new Array(toGeocode.length).fill(null);
     let completed = 0;
-
-    function placeAllMarkers() {
-      const valid = geocodeResults.filter(Boolean);
-      if (!valid.length) return;
-
-      // Calculate center manually — NO fitBounds, NO idle listener
-      const avgLat = valid.reduce((sum, r) => sum + r.position.lat(), 0) / valid.length;
-      const avgLng = valid.reduce((sum, r) => sum + r.position.lng(), 0) / valid.length;
-      mapInstanceRef.current.setCenter({ lat: avgLat, lng: avgLng });
-      mapInstanceRef.current.setZoom(12);
-
-      valid.forEach(({ doc, position, index }) => {
-        const marker = new window.google.maps.Marker({
-          map: mapInstanceRef.current,
-          position,
-          title: doc.name,
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 9,
-            fillColor: C.ocean,
-            fillOpacity: 1,
-            strokeColor: "white",
-            strokeWeight: 2,
-          },
-          label: { text: String(index + 1), color: "white", fontSize: "10px", fontWeight: "bold" },
-        });
-
-        marker._npi = doc.npi;
-
-        marker.addListener("click", () => {
-          // Direct set — no animation, no async, nothing can override this
-          mapInstanceRef.current.setCenter(position);
-          mapInstanceRef.current.setZoom(15);
-
-          if (infoWindowRef.current) {
-            infoWindowRef.current.setContent(`
-              <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
-                <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
-                <div style="color:#1a6b8a;font-size:12px;margin-bottom:4px;">${doc.specialty}</div>
-                <div style="color:#6b8f99;font-size:11px;">${doc.address}, ${doc.city}</div>
-                ${doc.accepting === true ? '<div style="color:#1a7a4a;font-size:11px;margin-top:4px;">✅ Accepting patients</div>' : ''}
-              </div>
-            `);
-            infoWindowRef.current.open(mapInstanceRef.current, marker);
-          }
-          if (onPinClick) onPinClick(doc.npi);
-        });
-
-        markersRef.current.push(marker);
-      });
-    }
 
     toGeocode.forEach((doc, index) => {
       setTimeout(() => {
         geocoder.geocode({ address: `${doc.address}, ${doc.city}, CA` }, (results, status) => {
-          if (status === "OK" && results[0]) {
-            geocodeResults[index] = { doc, position: results[0].geometry.location, index };
-          }
           completed++;
-          if (completed === toGeocode.length) placeAllMarkers();
+          if (status === "OK" && results[0] && mapInstanceRef.current) {
+            const position = results[0].geometry.location;
+
+            const marker = new window.google.maps.Marker({
+              map: mapInstanceRef.current,
+              position,
+              title: doc.name,
+              icon: {
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: 9,
+                fillColor: C.ocean,
+                fillOpacity: 1,
+                strokeColor: "white",
+                strokeWeight: 2,
+              },
+              label: { text: String(index + 1), color: "white", fontSize: "10px", fontWeight: "bold" },
+            });
+
+            marker._npi = doc.npi;
+
+            // Pin click: open info window only, NO map zoom or pan
+            marker.addListener("click", () => {
+              if (infoWindowRef.current && mapInstanceRef.current) {
+                infoWindowRef.current.setContent(`
+                  <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
+                    <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
+                    <div style="color:#1a6b8a;font-size:12px;margin-bottom:4px;">${doc.specialty}</div>
+                    <div style="color:#6b8f99;font-size:11px;">${doc.address}, ${doc.city}</div>
+                    ${doc.accepting === true ? '<div style="color:#1a7a4a;font-size:11px;margin-top:4px;">✅ Accepting patients</div>' : ''}
+                  </div>
+                `);
+                infoWindowRef.current.open(mapInstanceRef.current, marker);
+              }
+              if (onPinClick) onPinClick(doc.npi);
+            });
+
+            markersRef.current.push(marker);
+          }
         });
       }, index * 80);
     });
   }, [doctors]);
 
+  // Highlight marker color only — no position/zoom changes
   useEffect(() => {
     if (!window.google?.maps) return;
     markersRef.current.forEach(marker => {
       const isHighlighted = marker._npi === highlightedNpi;
       marker.setIcon({
         path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 9,
+        scale: isHighlighted ? 11 : 9,
         fillColor: isHighlighted ? "#e8622a" : C.ocean,
         fillOpacity: 1,
         strokeColor: "white",
