@@ -149,22 +149,47 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
 }
 
 // ── SEARCH MAP ──────────────────────────────────────────────────────────────
-function SearchMap({ doctors, highlightedNpi, onPinClick }) {
+// Key design: marker highlighting is done imperatively via a callback ref,
+// NOT through React state/useEffect — so changing highlight never causes a re-render
+// or flicker of the map markers.
+function SearchMap({ doctors, onPinClick, onHighlightChange }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const infoWindowRef = useRef(null);
+  const prevHighlightedRef = useRef(null);
 
-  // San Diego county bounds — used as initial view, never changes on pin click
-  const SD_CENTER = { lat: 32.8, lng: -117.1 };
-  const SD_ZOOM = 10;
+  // Expose highlight function to parent via callback
+  useEffect(() => {
+    if (onHighlightChange) {
+      onHighlightChange((npi) => {
+        // Unhighlight previous
+        if (prevHighlightedRef.current) {
+          const prev = markersRef.current.find(m => m._npi === prevHighlightedRef.current);
+          if (prev && window.google?.maps) {
+            prev.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2 });
+            prev.setZIndex(undefined);
+          }
+        }
+        // Highlight new
+        if (npi) {
+          const marker = markersRef.current.find(m => m._npi === npi);
+          if (marker && window.google?.maps) {
+            marker.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 11, fillColor: "#e8622a", fillOpacity: 1, strokeColor: "white", strokeWeight: 3 });
+            marker.setZIndex(999);
+          }
+        }
+        prevHighlightedRef.current = npi;
+      });
+    }
+  }, [onHighlightChange]);
 
   useEffect(() => {
     function initMap() {
       if (!mapRef.current || !window.google?.maps) return;
       const map = new window.google.maps.Map(mapRef.current, {
-        zoom: SD_ZOOM,
-        center: SD_CENTER,
+        zoom: 10,
+        center: { lat: 32.8, lng: -117.1 },
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
@@ -190,78 +215,50 @@ function SearchMap({ doctors, highlightedNpi, onPinClick }) {
 
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
+    prevHighlightedRef.current = null;
 
-    // Reset map to SD view when new doctors load
-    mapInstanceRef.current.setCenter(SD_CENTER);
-    mapInstanceRef.current.setZoom(SD_ZOOM);
+    mapInstanceRef.current.setCenter({ lat: 32.8, lng: -117.1 });
+    mapInstanceRef.current.setZoom(10);
 
     const geocoder = new window.google.maps.Geocoder();
-    const toGeocode = doctors.filter(d => d.address && d.city);
-    let completed = 0;
 
-    toGeocode.forEach((doc, index) => {
+    doctors.forEach((doc, index) => {
+      if (!doc.address || !doc.city) return;
       setTimeout(() => {
         geocoder.geocode({ address: `${doc.address}, ${doc.city}, CA` }, (results, status) => {
-          completed++;
-          if (status === "OK" && results[0] && mapInstanceRef.current) {
-            const position = results[0].geometry.location;
+          if (status !== "OK" || !results[0] || !mapInstanceRef.current) return;
+          const position = results[0].geometry.location;
 
-            const marker = new window.google.maps.Marker({
-              map: mapInstanceRef.current,
-              position,
-              title: doc.name,
-              icon: {
-                path: window.google.maps.SymbolPath.CIRCLE,
-                scale: 9,
-                fillColor: C.ocean,
-                fillOpacity: 1,
-                strokeColor: "white",
-                strokeWeight: 2,
-              },
-              label: { text: String(index + 1), color: "white", fontSize: "10px", fontWeight: "bold" },
-            });
+          const marker = new window.google.maps.Marker({
+            map: mapInstanceRef.current,
+            position,
+            title: doc.name,
+            icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2 },
+            label: { text: String(index + 1), color: "white", fontSize: "10px", fontWeight: "bold" },
+          });
 
-            marker._npi = doc.npi;
+          marker._npi = doc.npi;
 
-            // Pin click: open info window only, NO map zoom or pan
-            marker.addListener("click", () => {
-              if (infoWindowRef.current && mapInstanceRef.current) {
-                infoWindowRef.current.setContent(`
-                  <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
-                    <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
-                    <div style="color:#1a6b8a;font-size:12px;margin-bottom:4px;">${doc.specialty}</div>
-                    <div style="color:#6b8f99;font-size:11px;">${doc.address}, ${doc.city}</div>
-                    ${doc.accepting === true ? '<div style="color:#1a7a4a;font-size:11px;margin-top:4px;">✅ Accepting patients</div>' : ''}
-                  </div>
-                `);
-                infoWindowRef.current.open(mapInstanceRef.current, marker);
-              }
-              if (onPinClick) onPinClick(doc.npi);
-            });
+          marker.addListener("click", () => {
+            if (infoWindowRef.current && mapInstanceRef.current) {
+              infoWindowRef.current.setContent(`
+                <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
+                  <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
+                  <div style="color:#1a6b8a;font-size:12px;margin-bottom:4px;">${doc.specialty}</div>
+                  <div style="color:#6b8f99;font-size:11px;">${doc.address}, ${doc.city}</div>
+                  ${doc.accepting === true ? '<div style="color:#1a7a4a;font-size:11px;margin-top:4px;">✅ Accepting patients</div>' : ''}
+                </div>
+              `);
+              infoWindowRef.current.open(mapInstanceRef.current, marker);
+            }
+            if (onPinClick) onPinClick(doc.npi);
+          });
 
-            markersRef.current.push(marker);
-          }
+          markersRef.current.push(marker);
         });
       }, index * 80);
     });
   }, [doctors]);
-
-  // Highlight marker color only — no position/zoom changes
-  useEffect(() => {
-    if (!window.google?.maps) return;
-    markersRef.current.forEach(marker => {
-      const isHighlighted = marker._npi === highlightedNpi;
-      marker.setIcon({
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: isHighlighted ? 11 : 9,
-        fillColor: isHighlighted ? "#e8622a" : C.ocean,
-        fillOpacity: 1,
-        strokeColor: "white",
-        strokeWeight: isHighlighted ? 3 : 2,
-      });
-      marker.setZIndex(isHighlighted ? 999 : undefined);
-    });
-  }, [highlightedNpi]);
 
   return <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 12 }} />;
 }
@@ -340,6 +337,7 @@ export default function Search() {
   const [error, setError] = useState("");
   const [highlightedNpi, setHighlightedNpi] = useState(null);
   const cardRefs = useRef({});
+  const mapHighlightFnRef = useRef(null); // holds the imperative highlight function from SearchMap
   const perPage = 20;
 
   const fetchDoctors = useCallback(async () => {
@@ -368,8 +366,14 @@ export default function Search() {
 
   useEffect(() => { fetchDoctors(); }, []);
 
-  function handlePinClick(npi) {
+  // Called by card hover or pin click — updates both card highlight AND map marker directly
+  function handleHighlight(npi) {
     setHighlightedNpi(npi);
+    if (mapHighlightFnRef.current) mapHighlightFnRef.current(npi);
+  }
+
+  function handlePinClick(npi) {
+    handleHighlight(npi);
     setTimeout(() => {
       const el = cardRefs.current[npi];
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -468,7 +472,14 @@ export default function Search() {
             </div>
           )}
           {!loading && !error && pageData.map((doc, i) => (
-            <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} highlighted={highlightedNpi === doc.npi} onHover={setHighlightedNpi} cardRef={el => cardRefs.current[doc.npi] = el} />
+            <DoctorCard
+              key={doc.npi || i}
+              doc={doc}
+              isMobile={isMobile}
+              highlighted={highlightedNpi === doc.npi}
+              onHover={handleHighlight}
+              cardRef={el => cardRefs.current[doc.npi] = el}
+            />
           ))}
           {totalPages > 1 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 20, flexWrap: "wrap" }}>
@@ -495,7 +506,11 @@ export default function Search() {
               </div>
               <div style={{ height: "calc(100% - 44px)" }}>
                 {!loading && pageData.length > 0 ? (
-                  <SearchMap doctors={pageData} highlightedNpi={highlightedNpi} onPinClick={handlePinClick} />
+                  <SearchMap
+                    doctors={pageData}
+                    onPinClick={handlePinClick}
+                    onHighlightChange={fn => { mapHighlightFnRef.current = fn; }}
+                  />
                 ) : (
                   <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted, gap: 8 }}>
                     <span style={{ fontSize: 32 }}>🗺️</span>
