@@ -405,11 +405,30 @@ export default function Search() {
     }, 50);
   }
 
-  // When neighborhood changes, zoom the map to that area immediately
+  // When neighborhood changes, zoom map AND fetch new results for that city
   function handleNeighborhoodChange(name) {
     setPage(1);
     const coords = NEIGHBORHOOD_COORDS[name] || NEIGHBORHOOD_COORDS["All of San Diego"];
     if (mapViewFnRef.current) mapViewFnRef.current(coords);
+
+    // Fetch directly with new city value so pins update immediately
+    setLoading(true); setError(""); setResults([]);
+    const params = new URLSearchParams();
+    if (specialtySearch) params.set("specialty", specialtySearch);
+    if (name && name !== "All of San Diego") params.set("city", name);
+    params.set("limit", "500");
+    fetch(`/api/search?${params.toString()}`)
+      .then(r => r.json())
+      .then(data => {
+        let filtered = data.results || [];
+        if (gender) filtered = filtered.filter(d => d.gender === gender);
+        if (accepting) filtered = filtered.filter(d => d.accepting === true);
+        if (telehealth) filtered = filtered.filter(d => d.telehealth === true);
+        if (selectedLangs.length > 0) filtered = filtered.filter(d => selectedLangs.some(l => d.languages?.includes(l)));
+        setResults(filtered);
+      })
+      .catch(e => setError(e.message || "Something went wrong."))
+      .finally(() => setLoading(false));
   }
 
   // Clear all filters and reset map to full SD view
