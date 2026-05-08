@@ -8,7 +8,9 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
-// Map friendly search terms to what's actually stored in the database
+// Map friendly search terms to what's actually stored in the database.
+// Only alias terms that have ONE clear match. Broad terms like "therapy"
+// should NOT be aliased so they match across all therapy specialties.
 const SPECIALTY_ALIASES = {
   'primary care': 'Family Medicine',
   'general practice': 'Family Medicine',
@@ -21,12 +23,14 @@ const SPECIALTY_ALIASES = {
   'ear nose throat': 'ENT',
   'otolaryngology': 'ENT',
   'heart': 'Cardiology',
+  'cardio': 'Cardiology',
   'ortho': 'Orthopedic Surgery',
   'orthopedics': 'Orthopedic Surgery',
   'orthopaedics': 'Orthopedic Surgery',
   'mental health': 'Psychiatry',
-  'therapy': 'Psychiatry',
+  'psychiatrist': 'Psychiatry',
   'skin': 'Dermatology',
+  'dermatologist': 'Dermatology',
   'eye': 'Ophthalmology',
   'eyes': 'Ophthalmology',
   'vision': 'Ophthalmology',
@@ -34,7 +38,9 @@ const SPECIALTY_ALIASES = {
   'digestive': 'Gastroenterology',
   'brain': 'Neurology',
   'nerve': 'Neurology',
+  'neurologist': 'Neurology',
   'cancer': 'Oncology',
+  'oncologist': 'Oncology',
   'lung': 'Pulmonology',
   'lungs': 'Pulmonology',
   'breathing': 'Pulmonology',
@@ -50,11 +56,10 @@ const SPECIALTY_ALIASES = {
   'urinary': 'Urology',
   'allergy': 'Allergy & Immunology',
   'allergies': 'Allergy & Immunology',
+  'allergist': 'Allergy & Immunology',
   'sleep': 'Sleep Medicine',
   'sports': 'Sports Medicine',
   'pain': 'Pain Medicine',
-  'rehab': 'Physical Medicine & Rehabilitation',
-  'physical therapy': 'Physical Therapy',
   'np': 'Nurse Practitioner',
   'nurse practitioner': 'Nurse Practitioner',
   'pa': 'Physician Assistant',
@@ -63,14 +68,23 @@ const SPECIALTY_ALIASES = {
   'dental': 'General Dentistry',
   'dentistry': 'General Dentistry',
   'optometry': 'Optometry',
+  'optometrist': 'Optometry',
   'chiropractor': 'Chiropractic',
   'chiropractic': 'Chiropractic',
+  'podiatrist': 'Podiatry',
+  'foot': 'Podiatry',
+  'feet': 'Podiatry',
+  'hearing': 'Audiology',
+  'audiologist': 'Audiology',
 };
 
 function resolveSpecialty(input) {
   if (!input || input === 'All Specialties') return null;
   const lower = input.toLowerCase().trim();
-  return SPECIALTY_ALIASES[lower] || input;
+  // If there's a direct alias, use it
+  if (SPECIALTY_ALIASES[lower]) return SPECIALTY_ALIASES[lower];
+  // Otherwise return the original input — the ilike search will handle broad matches
+  return input;
 }
 
 function toProperCase(str) {
@@ -124,21 +138,17 @@ export default async function handler(req, res) {
       .limit(parseInt(limit))
       .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
 
-    // Resolve specialty alias (e.g. "Primary Care" → "Family Medicine")
     const resolvedSpecialty = resolveSpecialty(specialty);
 
-    // Specialty search
     if (resolvedSpecialty) {
       query = query.ilike('specialty', `%${resolvedSpecialty}%`);
     }
 
-    // Name search
     if (name) {
       const cleanName = name.replace(/^dr\.?\s*/i, '').trim();
       query = query.or(`first_name.ilike.%${cleanName}%,last_name.ilike.%${cleanName}%`);
     }
 
-    // If no specialty or name, return a broad sample of providers
     if (!resolvedSpecialty && !name) {
       query = supabase
         .from('providers')
@@ -147,24 +157,20 @@ export default async function handler(req, res) {
         .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
     }
 
-    // City filter
     if (city && city !== 'All of San Diego') {
       query = query.ilike('city', city);
     }
 
-    // Gender filter
     if (gender && gender !== '') {
       query = query.eq('gender', gender);
     }
 
-    // Sort by last name
     query = query.order('last_name', { ascending: true });
 
     const { data: providers, error, count } = await query;
 
     if (error) throw error;
 
-    // Fetch claimed listings
     const npis = (providers || []).map(p => p.npi);
     let claimedMap = {};
 
