@@ -417,6 +417,13 @@ export default function Search() {
     setQuery(""); setSpecialtySearch(""); setNeighborhood("All of San Diego");
     setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]); setPage(1);
     if (mapViewFnRef.current) mapViewFnRef.current(NEIGHBORHOOD_COORDS["All of San Diego"]);
+    // Fetch with cleared params directly so we don't wait for state to settle
+    setLoading(true); setError(""); setResults([]);
+    fetch("/api/search?limit=500")
+      .then(r => r.json())
+      .then(data => setResults(data.results || []))
+      .catch(e => setError(e.message || "Something went wrong."))
+      .finally(() => setLoading(false));
   }
 
   const sortedResults = useMemo(() => {
