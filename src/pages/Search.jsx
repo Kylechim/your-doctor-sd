@@ -38,6 +38,9 @@ const NEIGHBORHOOD_COORDS = {
   "Lakeside": { lat: 32.8576, lng: -116.9225, zoom: 13 },
 };
 
+// Session-level geocode cache — each address only geocoded once per browser session
+const geocodeCache = {};
+
 function SpecialtySearch({ value, onChange, onSelect, supabaseUrl, supabaseKey }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -248,37 +251,50 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef,
     prevNpiRef.current = null;
 
     const geocoder = new window.google.maps.Geocoder();
+
+    function placeMarker(doc, index, position) {
+      const marker = new window.google.maps.Marker({
+        map: mapInstanceRef.current,
+        position,
+        title: doc.name,
+        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2 },
+        label: { text: String(index + 1), color: "white", fontSize: "10px", fontWeight: "bold" },
+      });
+      marker._npi = doc.npi;
+      marker.addListener("click", () => {
+        if (infoWindowRef.current && mapInstanceRef.current) {
+          infoWindowRef.current.setContent(`
+            <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
+              <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
+              <div style="color:#1a6b8a;font-size:12px;margin-bottom:4px;">${doc.specialty}</div>
+              <div style="color:#6b8f99;font-size:11px;">${doc.address}, ${doc.city}</div>
+              ${doc.accepting === true ? '<div style="color:#1a7a4a;font-size:11px;margin-top:4px;">✅ Accepting patients</div>' : ''}
+            </div>
+          `);
+          infoWindowRef.current.open(mapInstanceRef.current, marker);
+        }
+        if (onPinClick) onPinClick(doc.npi);
+      });
+      markersRef.current.push(marker);
+    }
+
     doctors.forEach((doc, index) => {
       if (!doc.address || !doc.city) return;
-      setTimeout(() => {
-        geocoder.geocode({ address: `${doc.address}, ${doc.city}, CA` }, (results, status) => {
-          if (status !== "OK" || !results[0] || !mapInstanceRef.current) return;
-          const position = results[0].geometry.location;
-          const marker = new window.google.maps.Marker({
-            map: mapInstanceRef.current,
-            position,
-            title: doc.name,
-            icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2 },
-            label: { text: String(index + 1), color: "white", fontSize: "10px", fontWeight: "bold" },
-          });
-          marker._npi = doc.npi;
-          marker.addListener("click", () => {
-            if (infoWindowRef.current && mapInstanceRef.current) {
-              infoWindowRef.current.setContent(`
-                <div style="font-family:system-ui,sans-serif;padding:4px;min-width:160px;">
-                  <div style="font-weight:700;color:#0d3d52;font-size:13px;margin-bottom:2px;">${doc.name}</div>
-                  <div style="color:#1a6b8a;font-size:12px;margin-bottom:4px;">${doc.specialty}</div>
-                  <div style="color:#6b8f99;font-size:11px;">${doc.address}, ${doc.city}</div>
-                  ${doc.accepting === true ? '<div style="color:#1a7a4a;font-size:11px;margin-top:4px;">✅ Accepting patients</div>' : ''}
-                </div>
-              `);
-              infoWindowRef.current.open(mapInstanceRef.current, marker);
-            }
-            if (onPinClick) onPinClick(doc.npi);
-          });
-          markersRef.current.push(marker);
-        });
-      }, index * 80);
+      const cacheKey = `${doc.address},${doc.city}`;
+
+      // Use cached position instantly if available
+      if (geocodeCache[cacheKey]) {
+        placeMarker(doc, index, geocodeCache[cacheKey]);
+        return;
+      }
+
+      // Otherwise geocode and cache the result
+      geocoder.geocode({ address: `${doc.address}, ${doc.city}, CA` }, (results, status) => {
+        if (status !== "OK" || !results[0] || !mapInstanceRef.current) return;
+        const position = results[0].geometry.location;
+        geocodeCache[cacheKey] = position;
+        placeMarker(doc, index, position);
+      });
     });
   }, [doctors]);
 
@@ -409,7 +425,6 @@ export default function Search() {
   function handleNeighborhoodChange(name) {
     setPage(1);
     const coords = NEIGHBORHOOD_COORDS[name] || NEIGHBORHOOD_COORDS["All of San Diego"];
-    if (mapViewFnRef.current) mapViewFnRef.current(coords);
 
     // Fetch directly with new city value so pins update immediately
     setLoading(true); setError(""); setResults([]);
@@ -426,6 +441,10 @@ export default function Search() {
         if (telehealth) filtered = filtered.filter(d => d.telehealth === true);
         if (selectedLangs.length > 0) filtered = filtered.filter(d => selectedLangs.some(l => d.languages?.includes(l)));
         setResults(filtered);
+        // Zoom after results load so the map is fully mounted
+        setTimeout(() => {
+          if (mapViewFnRef.current) mapViewFnRef.current(coords);
+        }, 100);
       })
       .catch(e => setError(e.message || "Something went wrong."))
       .finally(() => setLoading(false));
