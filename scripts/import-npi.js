@@ -49,14 +49,33 @@ const SD_ZIPS = new Set([
   '92192','92193','92194','92195','92196','92197','92198','92199',
 ]);
 
-// Only import individual providers (not organizations) with these entity types
 const INDIVIDUAL_ENTITY_TYPE = '1';
 
-// NPI taxonomy codes that indicate medical providers (not labs, suppliers etc.)
+// NPI taxonomy codes that indicate medical/behavioral/therapy providers
 const MEDICAL_PREFIXES = [
-  '207', '208', '363', '364', '367', '374', '376', '111', '122', '124',
-  '125', '126', '132', '133', '136', '152', '156', '163', '164', '171',
-  '174', '175', '176', '177', '183', '193', '261', '291', '302', '305',
+  // Physicians & advanced practice
+  '207', '208', '363', '364', '367', '374', '376',
+  // Dental
+  '122', '124', '125', '126',
+  // Pharmacy
+  '183',
+  // Nursing
+  '163', '164',
+  // Allied health
+  '111', '132', '133', '136', '152', '156',
+  // Behavioral health, counselors, psychologists, social workers
+  '101', // Counselors (Mental Health, Addiction, School, Pastoral, Psychoanalyst)
+  '103', // Psychologists (Clinical Neuropsychologist, Behavioral Analyst)
+  '104', // Social Workers (Clinical Social Worker, School Social Worker)
+  '106', // Behavior Analysts, Marriage & Family Therapists, Behavior Technicians
+  // Therapy (physical, occupational, speech, massage, recreation, respiratory, music etc.)
+  '225', '226', '227', '228', '229',
+  // Audiology & speech
+  '231', '235',
+  // Other allied health
+  '171', '174', '175', '176', '177', '193',
+  // Facilities & clinics
+  '261', '291', '302', '305',
   '310', '311', '313', '314', '315', '317', '320', '321', '322', '323',
   '324', '385',
 ];
@@ -119,19 +138,83 @@ const TAXONOMY_NAMES = {
   '175F00000X': 'Case Manager/Care Coordinator',
   '174400000X': 'Specialist',
   '171W00000X': 'Contractor',
+  // ── Therapy specialties ──────────────────────────────────────────────────
   '225100000X': 'Physical Therapy',
+  '2251C2600X': 'Physical Therapy (Cardiopulmonary)',
+  '2251E1200X': 'Physical Therapy (Ergonomics)',
+  '2251E1300X': 'Physical Therapy (Electrophysiology)',
+  '2251G0304X': 'Physical Therapy (Geriatrics)',
+  '2251H1200X': 'Physical Therapy (Hand)',
+  '2251H1300X': 'Physical Therapy (Human Factors)',
+  '2251N0400X': 'Physical Therapy (Neurology)',
+  '2251P0200X': 'Physical Therapy (Pediatrics)',
+  '2251S0007X': 'Physical Therapy (Sports)',
+  '2251X0800X': 'Physical Therapy (Orthopedics)',
   '225200000X': 'Occupational Therapy',
+  '2252E0001X': 'Occupational Therapy (Environmental Modification)',
+  '2252P0214X': 'Occupational Therapy (Driving & Community Mobility)',
+  '2252R0408X': 'Occupational Therapy (Feeding, Eating & Swallowing)',
+  '2252S0001X': 'Occupational Therapy (Seating & Positioning)',
   '225400000X': 'Speech-Language Pathology',
+  '225500000X': 'Respiratory Therapy',
+  '2255A2300X': 'Respiratory Therapy (Advanced Practice)',
+  '2255E0002X': 'Respiratory Therapy (Perinatal/Pediatric)',
   '225600000X': 'Dance Therapy',
   '225700000X': 'Massage Therapy',
   '225800000X': 'Recreation Therapy',
-  '225900000X': 'Respiratory Therapy',
+  '225900000X': 'Art Therapy',
   '225A00000X': 'Music Therapy',
   '225B00000X': 'Pulmonary Function Technologist',
   '225C00000X': 'Rehabilitation Counselor',
+  '225CA2400X': 'Rehabilitation Counselor (Assistive Technology)',
+  '225CA2500X': 'Rehabilitation Counselor (Autism)',
+  '225CX0006X': 'Rehabilitation Counselor (Orientation & Mobility)',
+  '225X00000X': 'Occupational Therapy Assistant',
   '226300000X': 'Kinesiotherapist',
+  '227800000X': 'Respiratory Therapist (Certified)',
+  '227900000X': 'Respiratory Therapist (Registered)',
+  '229N00000X': 'Anesthesiologist Assistant',
+  // ── Behavioral health & counseling ──────────────────────────────────────
+  '101Y00000X': 'Counselor',
+  '101YA0400X': 'Addiction Counselor',
+  '101YM0800X': 'Mental Health Counselor',
+  '101YP1600X': 'Pastoral Counselor',
+  '101YP2500X': 'Psychoanalyst',
+  '101YS0200X': 'School Counselor',
+  '103G00000X': 'Clinical Neuropsychologist',
+  '103K00000X': 'Behavioral Analyst',
+  '103T00000X': 'Psychologist',
+  '103TA0400X': 'Psychologist (Addiction)',
+  '103TA0700X': 'Psychologist (Adult Development & Aging)',
+  '103TC0700X': 'Psychologist (Clinical)',
+  '103TC2200X': 'Psychologist (Clinical Child & Adolescent)',
+  '103TE1000X': 'Psychologist (Educational)',
+  '103TE1100X': 'Psychologist (Exercise & Sports)',
+  '103TF0000X': 'Psychologist (Family)',
+  '103TF0200X': 'Psychologist (Forensic)',
+  '103TH0004X': 'Psychologist (Health)',
+  '103TH0100X': 'Psychologist (Health Service)',
+  '103TM1700X': 'Psychologist (Men & Masculinity)',
+  '103TM1800X': 'Psychologist (Mental Retardation & Developmental Disabilities)',
+  '103TP0016X': 'Psychologist (Prescribing)',
+  '103TP0814X': 'Psychologist (Psychoanalysis)',
+  '103TP2701X': 'Psychologist (Group Psychotherapy)',
+  '103TR0400X': 'Psychologist (Rehabilitation)',
+  '103TS0200X': 'Psychologist (School)',
+  '103TW0100X': 'Psychologist (Women)',
+  '104100000X': 'Social Worker',
+  '1041C0700X': 'Clinical Social Worker',
+  '1041S0200X': 'School Social Worker',
+  '106E00000X': 'Assistant Behavior Analyst',
+  '106H00000X': 'Marriage & Family Therapist',
+  '106S00000X': 'Behavior Technician',
+  // ── Audiology ────────────────────────────────────────────────────────────
   '231H00000X': 'Audiologist',
+  '231HA2400X': 'Audiologist (Assistive Technology)',
+  '231HA2500X': 'Audiologist (Hearing Instrument Specialist)',
   '235500000X': 'Specialist/Technologist',
+  '235Z00000X': 'Speech-Language Pathology Assistant',
+  // ── Other ────────────────────────────────────────────────────────────────
   '247100000X': 'Radiologic Technologist',
   '261QM0801X': 'Mental Health Clinic',
   '261QR0400X': 'Rehabilitation Clinic',
@@ -145,21 +228,6 @@ const TAXONOMY_NAMES = {
   '323P00000X': 'Psychiatric Residential Treatment Facility',
   '324500000X': 'Substance Abuse Rehabilitation Facility',
   '385H00000X': 'Respite Care Facility',
-  '101Y00000X': 'Counselor',
-  '101YA0400X': 'Addiction Counselor',
-  '101YM0800X': 'Mental Health Counselor',
-  '101YP1600X': 'Pastoral Counselor',
-  '101YP2500X': 'Psychoanalyst',
-  '101YS0200X': 'School Counselor',
-  '103G00000X': 'Clinical Neuropsychologist',
-  '103K00000X': 'Behavioral Analyst',
-  '103T00000X': 'Psychologist',
-  '104100000X': 'Social Worker',
-  '1041C0700X': 'Clinical Social Worker',
-  '1041S0200X': 'School Social Worker',
-  '106E00000X': 'Assistant Behavior Analyst',
-  '106H00000X': 'Marriage & Family Therapist',
-  '106S00000X': 'Behavior Technician',
   '122400000X': 'Denturist',
   '1223D0001X': 'Dental Public Health',
   '1223E0200X': 'Endodontics',
@@ -235,11 +303,8 @@ const TAXONOMY_NAMES = {
 
 function getTaxonomyName(code) {
   if (!code) return 'General Practice';
-  const clean = code.toLowerCase().replace(/\s/g, '');
-  // Direct lookup
   const upper = code.toUpperCase();
   if (TAXONOMY_NAMES[upper]) return TAXONOMY_NAMES[upper];
-  // Partial match on first 7 chars
   const partial = Object.keys(TAXONOMY_NAMES).find(k => k.startsWith(upper.slice(0,7)));
   if (partial) return TAXONOMY_NAMES[partial];
   return 'General Practice';
@@ -266,29 +331,24 @@ function formatPhone(phone) {
 async function getNPIDownloadUrl() {
   console.log('📡 Finding latest NPI data file...');
 
-  // Try to scrape the CMS page first
   try {
     const res = await fetch('https://download.cms.gov/nppes/NPI_Files.html', {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; YourDoctorSD/1.0)' }
     });
     const html = await res.text();
 
-    // Find ALL zip file links
     const allMatches = [...html.matchAll(/href="([^"]*NPPES_Data_Dissemination[^"]*\.zip)"/g)];
     console.log('Found zip files:', allMatches.map(m => m[1]));
 
-    // Prefer the full replacement file (not pfile which is partial)
     for (const match of allMatches) {
       let url = match[1];
       if (url.startsWith('/')) url = 'https://download.cms.gov' + url;
       if (!url.startsWith('http')) url = 'https://download.cms.gov/nppes/' + url;
-      // Skip partial update files
       if (url.toLowerCase().includes('pfile') || url.toLowerCase().includes('update')) continue;
       console.log(`✅ Found full NPI file: ${url}`);
       return url;
     }
 
-    // If only partial file found, use it anyway
     if (allMatches.length > 0) {
       let url = allMatches[0][1];
       if (url.startsWith('/')) url = 'https://download.cms.gov' + url;
@@ -299,7 +359,6 @@ async function getNPIDownloadUrl() {
     console.log('Could not scrape CMS page, using direct URL...');
   }
 
-  // Fallback: try multiple URL formats for current and previous month
   const now = new Date();
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -326,7 +385,6 @@ async function getNPIDownloadUrl() {
     }
   }
 
-  // Last resort - use the known working URL
   const fallback = 'https://download.cms.gov/nppes/NPPES_Data_Dissemination_April_2026_V2.zip';
   console.log(`⚠️ Using hardcoded fallback: ${fallback}`);
   return fallback;
@@ -334,13 +392,10 @@ async function getNPIDownloadUrl() {
 
 async function downloadFile(url, destPath) {
   console.log(`⬇️  Downloading NPI data file (this is large ~700MB, may take a few minutes)...`);
-  
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-  
   const fileStream = createWriteStream(destPath);
   await pipeline(res.body, fileStream);
-  
   console.log(`✅ Download complete`);
 }
 
@@ -367,9 +422,7 @@ async function importProviders(zipPath) {
     batch = [];
   }
 
-  // Open the zip and find the CSV file inside
   const directory = await unzipper.Open.file(zipPath);
-  // Prefer full data file over partial update file
   let csvFile = directory.files.find(f => f.path.endsWith('.csv') && f.path.includes('npidata') && !f.path.includes('pfile'));
   if (!csvFile) csvFile = directory.files.find(f => f.path.endsWith('.csv') && f.path.includes('npidata'));
 
@@ -451,16 +504,10 @@ async function main() {
   const zipPath = path.join(__dirname, 'npi_data.zip');
 
   try {
-    // Step 1: Get download URL
     const downloadUrl = await getNPIDownloadUrl();
-
-    // Step 2: Download the file
     await downloadFile(downloadUrl, zipPath);
-
-    // Step 3: Parse and import
     const count = await importProviders(zipPath);
 
-    // Step 4: Clean up the large zip file
     if (existsSync(zipPath)) {
       unlinkSync(zipPath);
       console.log('🧹 Cleaned up temporary files');
