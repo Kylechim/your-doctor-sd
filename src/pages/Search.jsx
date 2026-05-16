@@ -386,7 +386,7 @@ export default function Search() {
 
   // Search inputs
   const [query, setQuery] = useState(urlQuery);
-  const [specialtySearch, setSpecialtySearch] = useState("");
+  const [specialtySearch, setSpecialtySearch] = useState(urlQuery);
   const [nameSearch, setNameSearch] = useState("");
   const [neighborhood, setNeighborhood] = useState(searchParams.get("city") || "All of San Diego");
   const [gender, setGender] = useState("");
