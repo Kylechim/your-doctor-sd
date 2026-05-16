@@ -120,21 +120,19 @@ function buildDoctor(row, claimed) {
   };
 }
 
-// Score a result for name search relevance — first name matches rank higher
 function scoreNameMatch(row, firstName, lastName) {
   let score = 0;
   const fn = (row.first_name || '').toLowerCase();
   const ln = (row.last_name || '').toLowerCase();
-
   if (firstName) {
-    if (fn === firstName) score += 10;         // exact first name match
-    else if (fn.startsWith(firstName)) score += 6; // first name starts with
-    else if (fn.includes(firstName)) score += 3;   // first name contains
+    if (fn === firstName) score += 10;
+    else if (fn.startsWith(firstName)) score += 6;
+    else if (fn.includes(firstName)) score += 3;
   }
   if (lastName) {
-    if (ln === lastName) score += 8;           // exact last name match
-    else if (ln.startsWith(lastName)) score += 4; // last name starts with
-    else if (ln.includes(lastName)) score += 2;   // last name contains
+    if (ln === lastName) score += 8;
+    else if (ln.startsWith(lastName)) score += 4;
+    else if (ln.includes(lastName)) score += 2;
   }
   return score;
 }
@@ -143,17 +141,17 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-  const { specialty, city, name, gender, limit = '200', offset = '0' } = req.query;
+  const { specialty, city, name, gender, limit = '20', offset = '0' } = req.query;
 
   try {
-    // For name searches use a higher limit since results are always few
-    const effectiveLimit = name ? 1000 : parseInt(limit);
+    const pageLimit = name ? 1000 : parseInt(limit);
+    const pageOffset = parseInt(offset);
 
     let query = supabase
       .from('providers')
       .select('*', { count: 'exact' })
-      .limit(effectiveLimit)
-      .range(parseInt(offset), parseInt(offset) + effectiveLimit - 1);
+      .limit(pageLimit)
+      .range(pageOffset, pageOffset + pageLimit - 1);
 
     const resolvedSpecialty = resolveSpecialty(specialty);
 
@@ -162,21 +160,15 @@ export default async function handler(req, res) {
     }
 
     if (name) {
-      // Strip "Dr." prefix
       const cleanName = name.replace(/^dr\.?\s*/i, '').trim();
-
-      // Split into parts to handle "firstname lastname" or just one name
       const parts = cleanName.split(/\s+/).filter(Boolean);
-
       if (parts.length >= 2) {
-        // "John Smith" — search first name AND last name
         const first = parts[0];
         const last = parts.slice(1).join(' ');
         query = query.or(
           `first_name.ilike.%${first}%,last_name.ilike.%${last}%,first_name.ilike.%${last}%,last_name.ilike.%${first}%`
         );
       } else {
-        // Single word — search both first and last name
         query = query.or(
           `first_name.ilike.%${cleanName}%,last_name.ilike.%${cleanName}%`
         );
@@ -187,8 +179,8 @@ export default async function handler(req, res) {
       query = supabase
         .from('providers')
         .select('*', { count: 'exact' })
-        .limit(parseInt(limit))
-        .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+        .limit(pageLimit)
+        .range(pageOffset, pageOffset + pageLimit - 1);
     }
 
     if (city && city !== 'All of San Diego') {
@@ -199,7 +191,6 @@ export default async function handler(req, res) {
       query = query.eq('gender', gender);
     }
 
-    // For name searches, don't pre-sort by last_name — we'll sort by relevance below
     if (!name) {
       query = query.order('last_name', { ascending: true });
     }
@@ -225,13 +216,12 @@ export default async function handler(req, res) {
 
     let results = (providers || []).map(p => buildDoctor(p, claimedMap[p.npi]));
 
-    // For name searches, sort by relevance — first name matches come first
+    // Sort name results by relevance — first name matches first
     if (name) {
       const cleanName = name.replace(/^dr\.?\s*/i, '').trim();
       const parts = cleanName.split(/\s+/).filter(Boolean);
       const firstName = parts.length >= 2 ? parts[0].toLowerCase() : cleanName.toLowerCase();
       const lastName = parts.length >= 2 ? parts.slice(1).join(' ').toLowerCase() : '';
-
       results = results
         .map(r => {
           const row = providers.find(p => p.npi === r.npi) || {};
@@ -244,6 +234,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       results,
       total: count || results.length,
+      offset: pageOffset,
+      limit: pageLimit,
+      hasMore: count ? pageOffset + pageLimit < count : false,
       query: { specialty: resolvedSpecialty, city, name, gender },
     });
 
