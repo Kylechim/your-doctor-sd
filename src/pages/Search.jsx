@@ -220,14 +220,14 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef,
     if (prevNpiRef.current) {
       const prev = markersRef.current.find(m => m._npi === prevNpiRef.current);
       if (prev) {
-        prev.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2 });
+        prev.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2.5 });
         prev.setZIndex(undefined);
       }
     }
     if (npi) {
       const next = markersRef.current.find(m => m._npi === npi);
       if (next) {
-        next.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 11, fillColor: "#e8622a", fillOpacity: 1, strokeColor: "white", strokeWeight: 3 });
+        next.setIcon({ path: window.google.maps.SymbolPath.CIRCLE, scale: 13, fillColor: "#e8622a", fillOpacity: 1, strokeColor: "white", strokeWeight: 3 });
         next.setZIndex(999);
       }
     }
@@ -279,8 +279,7 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef,
         map: mapInstanceRef.current,
         position,
         title: doc.name,
-        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2 },
-        label: { text: String(index + 1), color: "white", fontSize: "10px", fontWeight: "bold" },
+        icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2.5 },
       });
       marker._npi = doc.npi;
       marker.addListener("click", () => {
