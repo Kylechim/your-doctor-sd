@@ -154,7 +154,7 @@ export default function Home() {
 
       {/* TRUST BAR */}
       <div style={{ background: C.deep, color: "rgba(255,255,255,0.75)", display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "2rem", padding: "1.2rem 2rem" }}>
-        {[["🏥","40,000+","San Diego Providers"],["💳","50+","Insurance Plans"],["🌎","30+","Languages Spoken"],["✅","Always","Free for Patients"]].map(([icon, strong, label]) => (
+        {[["🏥","80,000+","San Diego Providers"],["💳","50+","Insurance Plans"],["🌎","30+","Languages Spoken"],["✅","Always","Free for Patients"]].map(([icon, strong, label]) => (
           <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 14 }}>
             <span>{icon}</span><strong style={{ color: "white" }}>{strong}</strong>&nbsp;{label}
           </div>
