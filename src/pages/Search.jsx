@@ -425,10 +425,10 @@ export default function Search() {
       if (!res.ok) throw new Error(data.error || "Search failed");
       const filtered = applyClientFilters(data.results || [], { gender, accepting, telehealth, selectedLangs });
       setResults(filtered);
-      setMapDoctors(filtered);
-      setTotal(data.total || 0);
+      setMapDoctors(filtered.slice(0, PAGE_SIZE));
+      setTotal(data.total || filtered.length);
       setOffset(PAGE_SIZE);
-      setHasMore(data.hasMore || false);
+      setHasMore(filtered.length > PAGE_SIZE || data.hasMore || false);
     } catch (e) {
       setError(e.message || "Something went wrong. Please try again.");
     } finally {
@@ -480,7 +480,7 @@ export default function Search() {
       .then(data => {
         const filtered = applyClientFilters(data.results || [], { gender, accepting, telehealth, selectedLangs });
         setResults(filtered);
-        setMapDoctors(filtered);
+        setMapDoctors(filtered.slice(0, PAGE_SIZE));
         setTotal(data.total || 0);
         setOffset(PAGE_SIZE);
         setHasMore(data.hasMore || false);
@@ -500,7 +500,7 @@ export default function Search() {
       .then(r => r.json())
       .then(data => {
         setResults(data.results || []);
-        setMapDoctors(data.results || []);
+        setMapDoctors((data.results || []).slice(0, PAGE_SIZE));
         setTotal(data.total || 0);
         setOffset(PAGE_SIZE);
         setHasMore(data.hasMore || false);
