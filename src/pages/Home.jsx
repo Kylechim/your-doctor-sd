@@ -19,6 +19,22 @@ const SLIDES = [
   { heading: <>Built for <em>our</em> community. Always <span style={{ color: C.dusk }}>free.</span></>, sub: "No hidden fees. No doctor pays to rank higher. Just honest results for San Diego." },
 ];
 
+// Animated count-up hook
+function useCountUp(target, duration = 2000) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let start = 0;
+    const increment = target / (duration / 16);
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= target) { setCount(target); clearInterval(timer); }
+      else setCount(Math.floor(start));
+    }, 16);
+    return () => clearInterval(timer);
+  }, [target, duration]);
+  return count;
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -26,6 +42,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [touchStart, setTouchStart] = useState(null);
+  const count = useCountUp(80000, 2200);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -70,12 +87,13 @@ export default function Home() {
         <style>{`
           @keyframes drift { 0%,100%{transform:translate(0,0)} 50%{transform:translate(12px,-18px)} }
           @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+          @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
         `}</style>
 
         <div style={{ position: "relative", zIndex: 2, maxWidth: 700, width: "100%" }}>
           {/* Badge */}
           <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(26,107,138,0.08)", border: "1px solid rgba(26,107,138,0.2)", color: C.ocean, fontSize: 12, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", padding: "0.4rem 1rem", borderRadius: 20, marginBottom: isMobile ? "1rem" : "1.6rem", animation: "fadeUp 0.6s ease both" }}>
-            <span style={{ width: 7, height: 7, background: C.dusk, borderRadius: "50%", display: "inline-block" }} />
+            <span style={{ width: 7, height: 7, background: C.dusk, borderRadius: "50%", display: "inline-block", animation: "pulse 2s ease infinite" }} />
             San Diego's Free Doctor Finder
           </div>
 
@@ -85,9 +103,22 @@ export default function Home() {
               <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(2.6rem,5.5vw,4.4rem)", lineHeight: 1.1, color: C.deep, marginBottom: "1.2rem", animation: "fadeUp 0.6s 0.1s ease both" }}>
                 Find <em>your</em> doctor<br />right here in <span style={{ color: C.dusk }}>San Diego.</span>
               </h1>
-              <p style={{ fontSize: "1.05rem", fontWeight: 300, color: C.muted, lineHeight: 1.75, maxWidth: 500, margin: "0 auto 2.4rem", animation: "fadeUp 0.6s 0.2s ease both" }}>
+              <p style={{ fontSize: "1.05rem", fontWeight: 300, color: C.muted, lineHeight: 1.75, maxWidth: 500, margin: "0 auto 1.6rem", animation: "fadeUp 0.6s 0.2s ease both" }}>
                 No paywalls. No paid rankings. Just every doctor in San Diego — searchable by specialty, insurance, language, and more.
               </p>
+
+              {/* 80K stat — sits between subtext and search card */}
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 12, background: "white", border: `1.5px solid ${C.border}`, borderRadius: 50, padding: "0.5rem 1.4rem 0.5rem 0.6rem", marginBottom: "1.6rem", boxShadow: "0 4px 16px rgba(13,61,82,0.08)", animation: "fadeUp 0.6s 0.25s ease both" }}>
+                <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ fontSize: 16 }}>🏥</span>
+                </div>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.3rem", fontWeight: 700, color: C.deep, lineHeight: 1 }}>
+                    {count >= 80000 ? "80,000+" : count.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.muted, fontWeight: 400 }}>licensed San Diego providers</div>
+                </div>
+              </div>
             </>
           )}
 
@@ -99,7 +130,7 @@ export default function Home() {
                 const diff = touchStart - e.changedTouches[0].clientX;
                 if (Math.abs(diff) > 40) setSlide(s => (s + (diff > 0 ? 1 : -1) + SLIDES.length) % SLIDES.length);
               }}
-              style={{ marginBottom: "1.4rem" }}
+              style={{ marginBottom: "1rem" }}
             >
               <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "2rem", lineHeight: 1.2, color: C.deep, marginBottom: "0.8rem" }}>
                 {SLIDES[slide].heading}
@@ -109,6 +140,21 @@ export default function Home() {
                 {SLIDES.map((_, i) => (
                   <div key={i} onClick={() => setSlide(i)} style={{ width: 7, height: 7, borderRadius: "50%", background: i === slide ? C.ocean : "rgba(26,107,138,0.2)", cursor: "pointer", transition: "background 0.2s" }} />
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Mobile 80K stat */}
+          {isMobile && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, background: "white", border: `1.5px solid ${C.border}`, borderRadius: 50, padding: "0.45rem 1.2rem 0.45rem 0.5rem", marginBottom: "1.2rem", boxShadow: "0 4px 16px rgba(13,61,82,0.08)" }}>
+              <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontSize: 14 }}>🏥</span>
+              </div>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "1.1rem", fontWeight: 700, color: C.deep, lineHeight: 1 }}>
+                  {count >= 80000 ? "80,000+" : count.toLocaleString()}
+                </div>
+                <div style={{ fontSize: 10, color: C.muted }}>licensed San Diego providers</div>
               </div>
             </div>
           )}
@@ -137,7 +183,7 @@ export default function Home() {
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: "0.8rem" }}>
               <span style={{ fontSize: 12, color: C.muted }}>Popular:</span>
               {["Primary Care","Pediatrics","Spanish-speaking","Accepting Patients","Telehealth"].map(tag => (
-                <button key={tag} onClick={() => { navigate(`/search?q=${encodeURIComponent(tag)}`); }}
+                <button key={tag} onClick={() => navigate(`/search?q=${encodeURIComponent(tag)}`)}
                   style={{ fontSize: 12, padding: "3px 10px", borderRadius: 20, background: "rgba(26,107,138,0.07)", color: C.ocean, border: "1px solid rgba(26,107,138,0.15)", cursor: "pointer", fontFamily: "inherit" }}>
                   {tag}
                 </button>
@@ -151,15 +197,6 @@ export default function Home() {
           <path d="M0,35 C360,70 1080,0 1440,35 L1440,70 L0,70 Z" fill={C.deep} />
         </svg>
       </section>
-
-      {/* TRUST BAR */}
-      <div style={{ background: C.deep, color: "rgba(255,255,255,0.75)", display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "2rem", padding: "1.2rem 2rem" }}>
-        {[["🏥","80,000+","San Diego Providers"],["💳","50+","Insurance Plans"],["🌎","30+","Languages Spoken"],["✅","Always","Free for Patients"]].map(([icon, strong, label]) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 14 }}>
-            <span>{icon}</span><strong style={{ color: "white" }}>{strong}</strong>&nbsp;{label}
-          </div>
-        ))}
-      </div>
 
       {/* HOW IT WORKS */}
       <section style={{ maxWidth: 1050, margin: "0 auto", padding: "4.5rem 1.5rem" }}>
