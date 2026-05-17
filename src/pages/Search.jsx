@@ -490,6 +490,7 @@ export default function Search() {
   }
 
   function clearAll() {
+    navigate("/search", { replace: true }); // clear URL params
     setQuery(""); setSpecialtySearch(""); setNameSearch(""); setNeighborhood("All of San Diego");
     setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]);
     setResults([]); setTotal(0); setOffset(0); setHasMore(false);
