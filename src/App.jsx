@@ -5,6 +5,8 @@ import Profile from "./pages/Profile";
 import Claim from "./pages/Claim";
 import About from "./pages/About";
 import Pricing from "./pages/Pricing";
+import Privacy from "./pages/Privacy";
+import Contact from "./pages/Contact";
 
 export default function App() {
   return (
@@ -16,6 +18,8 @@ export default function App() {
         <Route path="/claim" element={<Claim />} />
         <Route path="/about" element={<About />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/contact" element={<Contact />} />
       </Routes>
     </BrowserRouter>
   );
