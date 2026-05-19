@@ -173,7 +173,12 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
       }}
     >
       <div style={{ display: "flex", gap: "0.8rem", alignItems: "flex-start" }}>
-        <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, background: highlighted ? `linear-gradient(135deg, ${C.ocean}, ${C.deep})` : `linear-gradient(135deg, ${C.sky}, ${C.ocean})`, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 14, transition: "background 0.15s" }}>{initials}</div>
+        <div style={{ width: 46, height: 46, borderRadius: "50%", flexShrink: 0, background: highlighted ? `linear-gradient(135deg, ${C.ocean}, ${C.deep})` : `linear-gradient(135deg, ${C.sky}, ${C.ocean})`, display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s", overflow: "hidden" }}>
+          <svg viewBox="0 0 46 46" width="46" height="46" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="23" cy="17" r="8" fill="rgba(255,255,255,0.9)" />
+            <ellipse cx="23" cy="38" rx="13" ry="10" fill="rgba(255,255,255,0.9)" />
+          </svg>
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, color: highlighted ? C.ocean : C.deep, fontSize: isMobile ? 14 : 15, lineHeight: 1.3, transition: "color 0.15s" }}>{doc.name}</div>
           <div style={{ color: C.ocean, fontSize: 12, fontWeight: 500, marginTop: 2 }}>{doc.specialty}</div>
@@ -189,7 +194,7 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: "0.7rem" }}>
         {doc.accepting === true && <Pill icon="✅" text="Accepting" green />}
         {doc.accepting === false && <Pill icon="❌" text="Not Accepting" red />}
-        {doc.accepting === null && <Pill icon="❓" text="Not yet reported" />}
+
         {doc.telehealth === true && <Pill icon="💻" text="Telehealth" />}
         {doc.verified && <Pill icon="🏅" text="Verified" blue />}
         {doc.gender === "F" && <Pill icon="👩‍⚕️" text="Female" />}
@@ -526,26 +531,23 @@ export default function Search() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       <nav style={{ position: "sticky", top: 0, zIndex: 200, background: "rgba(253,250,245,0.97)", backdropFilter: "blur(12px)", borderBottom: `1px solid rgba(26,107,138,0.12)`, padding: isMobile ? "0.75rem 1rem" : "0.8rem 1.2rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: isMobile ? "0.6rem" : 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: isMobile ? "wrap" : "nowrap" }}>
           <div onClick={() => navigate("/")} style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 17 : 19, color: C.ocean, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Your Doctor <span style={{ color: C.dusk }}>SD</span></div>
           {!isMobile && (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 15, color: C.muted, fontStyle: "italic" }}>Finding care, made simple.</span>
-              <button onClick={() => setShowMap(m => !m)} style={{ display: "flex", alignItems: "center", gap: 6, background: showMap ? C.ocean : "white", color: showMap ? "white" : C.ocean, border: `1.5px solid ${C.ocean}`, padding: "0.4rem 0.9rem", borderRadius: 8, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button onClick={() => setShowMap(m => !m)} style={{ display: "flex", alignItems: "center", gap: 6, background: showMap ? C.ocean : "white", color: showMap ? "white" : C.ocean, border: `1.5px solid ${C.ocean}`, padding: "0.4rem 0.9rem", borderRadius: 8, fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
                 🗺️ {showMap ? "Hide Map" : "Show Map"}
               </button>
             </div>
           )}
         </div>
-        {isMobile && (
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && fetchDoctors()} placeholder="Search by specialty or doctor name…" style={{ flex: 1, padding: "0.55rem 0.9rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: 14, outline: "none", background: "white" }} />
-            <button onClick={fetchDoctors} style={{ background: C.ocean, color: "white", border: "none", padding: "0.55rem 0.9rem", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🔍</button>
-            <button onClick={() => setShowFilters(true)} style={{ background: activeFilterCount > 0 ? C.ocean : "white", color: activeFilterCount > 0 ? "white" : C.ocean, border: `1.5px solid ${activeFilterCount > 0 ? C.ocean : C.border}`, padding: "0.55rem 0.9rem", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-              ⚙️{activeFilterCount > 0 && <span style={{ background: C.dusk, color: "white", borderRadius: "50%", width: 18, height: 18, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>{activeFilterCount}</span>}
-            </button>
-          </div>
-        )}
+        <div style={{ display: "flex", gap: "0.5rem", marginTop: isMobile ? "0.6rem" : 0 }}>
+          <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && fetchDoctors()} placeholder="Search by specialty or doctor name…" style={{ flex: 1, padding: "0.55rem 0.9rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: isMobile ? 14 : 13, outline: "none", background: "white", maxWidth: isMobile ? "none" : 340 }} />
+          <button onClick={fetchDoctors} style={{ background: C.ocean, color: "white", border: "none", padding: "0.55rem 0.9rem", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🔍</button>
+          {isMobile && <button onClick={() => setShowFilters(true)} style={{ background: activeFilterCount > 0 ? C.ocean : "white", color: activeFilterCount > 0 ? "white" : C.ocean, border: `1.5px solid ${activeFilterCount > 0 ? C.ocean : C.border}`, padding: "0.55rem 0.9rem", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+            ⚙️{activeFilterCount > 0 && <span style={{ background: C.dusk, color: "white", borderRadius: "50%", width: 18, height: 18, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>{activeFilterCount}</span>}
+          </button>}
+        </div>
       </nav>
 
       {isMobile && showFilters && <>
