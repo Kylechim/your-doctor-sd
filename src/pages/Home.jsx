@@ -19,7 +19,6 @@ const SLIDES = [
   { heading: <>Built for <em>our</em> community. Always <span style={{ color: C.dusk }}>free.</span></>, sub: "No hidden fees. No doctor pays to rank higher. Just honest results for San Diego." },
 ];
 
-// Animated count-up hook
 function useCountUp(target, duration = 2000) {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -70,7 +69,6 @@ export default function Home() {
         position: "relative", overflow: "hidden", textAlign: "center",
         background: "linear-gradient(175deg, #e8f6f9 0%, #fdfaf5 50%, #fef3e2 100%)",
       }}>
-        {/* Orbs */}
         {[
           { w: 300, h: 300, bg: C.sky, top: "5%", left: "-8%", delay: "0s" },
           { w: 200, h: 200, bg: "#a8d8bc", top: "15%", right: "-5%", delay: "-3s" },
@@ -107,7 +105,7 @@ export default function Home() {
                 No paywalls. No paid rankings. Just every doctor in San Diego — searchable by specialty, insurance, language, and more.
               </p>
 
-              {/* 80K stat — sits between subtext and search card */}
+              {/* 80K stat */}
               <div style={{ display: "inline-flex", alignItems: "center", gap: 12, background: "white", border: `1.5px solid ${C.border}`, borderRadius: 50, padding: "0.5rem 1.4rem 0.5rem 0.6rem", marginBottom: "1.6rem", boxShadow: "0 4px 16px rgba(13,61,82,0.08)", animation: "fadeUp 0.6s 0.25s ease both" }}>
                 <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <span style={{ fontSize: 16 }}>🏥</span>
@@ -176,7 +174,7 @@ export default function Home() {
                   {["La Jolla","Chula Vista","Encinitas","Oceanside","El Cajon","Escondido","National City","Santee","Poway"].map(n => <option key={n}>{n}</option>)}
                 </select>
               </div>
-              <button onClick={handleSearch} style={{ alignSelf: "flex-end", background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, color: "white", border: "none", padding: "0.75rem 1.6rem", borderRadius: "0.65rem", fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              <button onClick={() => handleSearch()} style={{ alignSelf: "flex-end", background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, color: "white", border: "none", padding: "0.75rem 1.6rem", borderRadius: "0.65rem", fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 🔍 Find Doctors
               </button>
             </div>
@@ -227,7 +225,7 @@ export default function Home() {
           <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(1.6rem,3vw,2.4rem)", color: C.deep, marginBottom: "2rem" }}>What kind of care are you looking for?</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: "0.9rem" }}>
             {[["🩺","Primary Care"],["👶","Pediatrics"],["🦷","Dentistry"],["👁️","Optometry"],["🧠","Mental Health"],["❤️","Cardiology"],["🦴","Orthopedics"],["🤰","OB-GYN"],["🧪","Dermatology"],["💊","Oncology"],["🫁","Pulmonology"],["➕","View All"]].map(([icon, label]) => (
-              <div key={label} onClick={() => navigate(`/search?q=${label}`)}
+              <div key={label} onClick={() => navigate(label === "View All" ? "/search" : `/search?q=${encodeURIComponent(label)}`)}
                 style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: "0.85rem", padding: "1.1rem 0.8rem", display: "flex", flexDirection: "column", alignItems: "center", gap: 7, cursor: "pointer", textAlign: "center", transition: "border-color 0.15s" }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = C.sky}
                 onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
@@ -244,8 +242,8 @@ export default function Home() {
       <div style={{ background: `linear-gradient(135deg, ${C.ocean}, ${C.deep})`, color: "white", padding: "3.5rem 1.5rem", textAlign: "center" }}>
         <div style={{ maxWidth: 560, margin: "0 auto" }}>
           <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(1.6rem,3vw,2.2rem)", marginBottom: "0.9rem" }}>Are you a San Diego provider?</h2>
-          <p style={{ fontSize: 15, fontWeight: 300, opacity: 0.85, lineHeight: 1.75, marginBottom: "1.8rem" }}>Claim your listing and make sure patients can find you. No fees. No ranking games.</p>
-          <button onClick={() => navigate("/claim")} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: C.dusk, color: "white", border: "none", padding: "0.85rem 2rem", borderRadius: 25, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+          <p style={{ fontSize: 15, fontWeight: 300, opacity: 0.85, lineHeight: 1.75, marginBottom: "1.8rem" }}>Claim your listing and make sure patients can find you. No ranking games.</p>
+          <button onClick={() => navigate("/pricing")} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: C.dusk, color: "white", border: "none", padding: "0.85rem 2rem", borderRadius: 25, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
             🏥 Claim Your Listing
           </button>
         </div>
@@ -255,8 +253,11 @@ export default function Home() {
       <footer style={{ background: C.deep, color: "rgba(255,255,255,0.5)", padding: "2rem 1.5rem", textAlign: "center", fontSize: 13, lineHeight: 1.9 }}>
         <div>Made with ♥ for San Diego &nbsp;|&nbsp; <strong style={{ color: "rgba(255,255,255,0.8)" }}>Your Doctor SD</strong></div>
         <div style={{ marginTop: 4 }}>
-          {["About","Privacy","Contact","For Providers"].map((l, i) => (
-            <span key={l}><span style={{ color: C.sky, cursor: "pointer" }}>{l}</span>{i < 3 ? " · " : ""}</span>
+          {[["About", "/about"], ["Privacy", "/privacy"], ["Contact", "/contact"], ["For Providers", "/pricing"]].map(([l, path], i) => (
+            <span key={l}>
+              <span onClick={() => navigate(path)} style={{ color: C.sky, cursor: "pointer" }}>{l}</span>
+              {i < 3 ? " · " : ""}
+            </span>
           ))}
         </div>
         <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55 }}>Provider data sourced from the National Provider Index (NPI) and CMS public datasets. Always verify insurance directly with your provider.</div>
