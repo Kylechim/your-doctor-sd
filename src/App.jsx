@@ -14,7 +14,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/search" element={<Search />} />
-        <Route path="/doctor/:id" element={<Profile />} />
+        {/* SEO-friendly slug route: /doctor/john-smith-cardiology-san-diego-1234567890 */}
+        <Route path="/doctor/:slug" element={<Profile />} />
         <Route path="/claim" element={<Claim />} />
         <Route path="/about" element={<About />} />
         <Route path="/pricing" element={<Pricing />} />
