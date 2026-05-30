@@ -6,6 +6,13 @@ const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
 const PAGE_SIZE = 20;
 
+// Generate SEO-friendly slug — must match Profile.jsx
+function makeDocSlug(doc) {
+  const name = (doc.name || "").replace(/^Dr\.?\s*/i, "").replace(/,.*$/, "").trim();
+  const raw = `${name} ${doc.specialty || ""} ${doc.city || ""} ${doc.npi}`;
+  return raw.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
+}
+
 const NEIGHBORHOOD_COORDS = {
   "All of San Diego": { lat: 32.8, lng: -117.1, zoom: 10 },
   "San Diego": { lat: 32.7157, lng: -117.1611, zoom: 12 },
@@ -155,9 +162,8 @@ function Spinner({ small }) {
 
 function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
   const navigate = useNavigate();
-  const initials = doc.name.replace(/Dr\.\s*/, "").split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   return (
-    <div ref={cardRef} onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })}
+    <div ref={cardRef} onClick={() => navigate(`/doctor/${makeDocSlug(doc)}`, { state: { doc } })}
       onMouseEnter={() => onHover && onHover(doc.npi)}
       onMouseLeave={() => onHover && onHover(null)}
       style={{
@@ -187,14 +193,13 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
         {isMobile && (
           <div style={{ display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
             {doc.phone && doc.phone !== "Call for number" && <button onClick={e => { e.stopPropagation(); window.location = `tel:${doc.phone}`; }} style={{ background: C.ocean, color: "white", border: "none", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📞 Call</button>}
-            <button onClick={e => { e.stopPropagation(); navigate(`/doctor/${doc.npi}`, { state: { doc } }); }} style={{ background: "transparent", color: C.ocean, border: `1.5px solid ${C.ocean}`, padding: "5px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer" }}>Profile</button>
+            <button onClick={e => { e.stopPropagation(); navigate(`/doctor/${makeDocSlug(doc)}`, { state: { doc } }); }} style={{ background: "transparent", color: C.ocean, border: `1.5px solid ${C.ocean}`, padding: "5px 10px", borderRadius: 8, fontSize: 11, cursor: "pointer" }}>Profile</button>
           </div>
         )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: "0.7rem" }}>
         {doc.accepting === true && <Pill icon="✅" text="Accepting" green />}
         {doc.accepting === false && <Pill icon="❌" text="Not Accepting" red />}
-
         {doc.telehealth === true && <Pill icon="💻" text="Telehealth" />}
         {doc.verified && <Pill icon="🏅" text="Verified" blue />}
         {doc.gender === "F" && <Pill icon="👩‍⚕️" text="Female" />}
@@ -205,7 +210,7 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
         {!isMobile && (
           <div style={{ display: "flex", gap: 6 }}>
             {doc.phone && doc.phone !== "Call for number" && <button onClick={e => { e.stopPropagation(); window.location = `tel:${doc.phone}`; }} style={{ background: C.ocean, color: "white", border: "none", padding: "5px 13px", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>📞 Call</button>}
-            <button onClick={e => { e.stopPropagation(); navigate(`/doctor/${doc.npi}`, { state: { doc } }); }} style={{ background: "transparent", color: C.ocean, border: `1.5px solid ${C.ocean}`, padding: "4px 11px", borderRadius: 7, fontSize: 11, cursor: "pointer" }}>Profile</button>
+            <button onClick={e => { e.stopPropagation(); navigate(`/doctor/${makeDocSlug(doc)}`, { state: { doc } }); }} style={{ background: "transparent", color: C.ocean, border: `1.5px solid ${C.ocean}`, padding: "4px 11px", borderRadius: 7, fontSize: 11, cursor: "pointer" }}>Profile</button>
           </div>
         )}
       </div>
@@ -389,7 +394,6 @@ export default function Search() {
   const rawQuery = searchParams.get("q") || "";
   const urlQuery = rawQuery.includes("object") ? "" : rawQuery;
 
-  // Search inputs
   const [query, setQuery] = useState(urlQuery);
   const [specialtySearch, setSpecialtySearch] = useState(urlQuery);
   const [nameSearch, setNameSearch] = useState("");
@@ -400,7 +404,6 @@ export default function Search() {
   const [selectedLangs, setSelectedLangs] = useState([]);
   const [sort, setSort] = useState("smart");
 
-  // Results state — accumulates as user loads more
   const [results, setResults] = useState([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -408,10 +411,7 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
-
-  // Map state — always shows the most recent batch of 20
   const [mapDoctors, setMapDoctors] = useState([]);
-
   const [showFilters, setShowFilters] = useState(false);
   const [showMap, setShowMap] = useState(true);
   const [highlightedNpi, setHighlightedNpi] = useState(null);
@@ -419,7 +419,6 @@ export default function Search() {
   const highlightFnRef = useRef(null);
   const mapViewFnRef = useRef(null);
 
-  // Initial fetch — replaces results
   const fetchDoctors = useCallback(async () => {
     setLoading(true); setError(""); setResults([]); setTotal(0); setOffset(0); setHasMore(false);
     const params = buildParams({ specialtySearch, nameSearch, query, neighborhood, offset: 0 });
@@ -440,7 +439,6 @@ export default function Search() {
     }
   }, [query, neighborhood, specialtySearch, nameSearch, gender, accepting, telehealth, selectedLangs]);
 
-  // Load more — appends to results
   async function loadMore() {
     setLoadingMore(true);
     const params = buildParams({ specialtySearch, nameSearch, query, neighborhood, offset });
@@ -450,7 +448,7 @@ export default function Search() {
       if (!res.ok) throw new Error(data.error || "Search failed");
       const filtered = applyClientFilters(data.results || [], { gender, accepting, telehealth, selectedLangs });
       setResults(prev => [...prev, ...filtered]);
-      setMapDoctors(filtered); // map shows the new batch
+      setMapDoctors(filtered);
       setOffset(prev => prev + PAGE_SIZE);
       setHasMore(data.hasMore || false);
     } catch (e) {
@@ -495,7 +493,7 @@ export default function Search() {
   }
 
   function clearAll() {
-    navigate("/search", { replace: true }); // clear URL params
+    navigate("/search", { replace: true });
     setQuery(""); setSpecialtySearch(""); setNameSearch(""); setNeighborhood("All of San Diego");
     setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]);
     setResults([]); setTotal(0); setOffset(0); setHasMore(false);
@@ -521,9 +519,7 @@ export default function Search() {
     return results;
   }, [results, sort]);
 
-  // Stable map doctors — only updates when mapDoctors changes
   const stableMapDoctors = useMemo(() => mapDoctors, [mapDoctors]);
-
   const activeFilterCount = [specialtySearch !== "", nameSearch !== "", gender !== "", accepting, telehealth, neighborhood !== "All of San Diego", selectedLangs.length > 0].filter(Boolean).length;
 
   return (
@@ -608,7 +604,6 @@ export default function Search() {
             <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} highlighted={highlightedNpi === doc.npi} onHover={handleHighlight} cardRef={el => cardRefs.current[doc.npi] = el} />
           ))}
 
-          {/* Load More button */}
           {!loading && !error && hasMore && (
             <div style={{ textAlign: "center", marginTop: 16 }}>
               {loadingMore ? <Spinner small /> : (
