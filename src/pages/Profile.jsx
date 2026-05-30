@@ -38,7 +38,7 @@ function ClaimNudge({ navigate }) {
         <div style={{ fontWeight: 600, color: C.deep, fontSize: 14, marginBottom: 3 }}>Is this your practice?</div>
         <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>Claim your listing to add insurance, hours, telehealth availability and more.</div>
       </div>
-      <button onClick={() => navigate("/claim")} style={{ background: C.ocean, color: "white", border: "none", padding: "0.6rem 1.3rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+      <button onClick={() => navigate("/pricing")} style={{ background: C.ocean, color: "white", border: "none", padding: "0.6rem 1.3rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
         Claim Free Listing →
       </button>
     </div>
@@ -86,68 +86,81 @@ function GoogleMap({ address, city }) {
   const mapRef = useRef(null);
   const fullAddress = `${address}, ${city}, CA`;
   const [mapError, setMapError] = useState(false);
-
   useEffect(() => {
     if (!address || !mapRef.current) return;
-
     function initMap() {
       if (!mapRef.current) return;
-      if (!window.google || !window.google.maps) {
-        setMapError(true);
-        return;
-      }
+      if (!window.google || !window.google.maps) { setMapError(true); return; }
       try {
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ address: fullAddress }, (results, status) => {
           if (status === "OK" && results[0] && mapRef.current) {
             const map = new window.google.maps.Map(mapRef.current, {
-              zoom: 15,
-              center: results[0].geometry.location,
-              mapTypeControl: false,
-              streetViewControl: false,
-              fullscreenControl: false,
+              zoom: 15, center: results[0].geometry.location,
+              mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
             });
-            new window.google.maps.Marker({
-              map,
-              position: results[0].geometry.location,
-              title: fullAddress,
-            });
-          } else {
-            setMapError(true);
-          }
+            new window.google.maps.Marker({ map, position: results[0].geometry.location, title: fullAddress });
+          } else { setMapError(true); }
         });
-      } catch (e) {
-        setMapError(true);
-      }
+      } catch (e) { setMapError(true); }
     }
-
-    // Poll until Google Maps SDK is ready (handles async defer loading)
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
-      if (window.google && window.google.maps) {
-        clearInterval(interval);
-        initMap();
-      } else if (attempts > 20) {
-        clearInterval(interval);
-        setMapError(true);
-      }
+      if (window.google && window.google.maps) { clearInterval(interval); initMap(); }
+      else if (attempts > 20) { clearInterval(interval); setMapError(true); }
     }, 250);
-
     return () => clearInterval(interval);
   }, [fullAddress]);
 
   if (mapError) return (
-    <div
-      style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, rgba(26,107,138,0.08), rgba(77,184,212,0.12))`, borderRadius: 10, gap: 6, cursor: "pointer", color: C.muted, fontSize: 12 }}
-      onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`, '_blank')}
-    >
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, rgba(26,107,138,0.08), rgba(77,184,212,0.12))`, borderRadius: 10, gap: 6, cursor: "pointer", color: C.muted, fontSize: 12 }}
+      onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`, '_blank')}>
       <span style={{ fontSize: 26 }}>🗺️</span>
       <span>View on Google Maps</span>
     </div>
   );
-
   return <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 10 }} />;
+}
+
+// Doctor silhouette SVG avatar
+function DoctorAvatar({ size = 100, photo, name }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", background: photo ? "transparent" : "rgba(255,255,255,0.15)", border: "3px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {photo
+        ? <img src={photo} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        : (
+          <svg viewBox="0 0 100 100" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="38" r="22" fill="rgba(255,255,255,0.85)" />
+            <ellipse cx="50" cy="85" rx="32" ry="22" fill="rgba(255,255,255,0.85)" />
+          </svg>
+        )
+      }
+    </div>
+  );
+}
+
+// Small card for providers at the same address
+function NearbyProviderCard({ doc, navigate }) {
+  return (
+    <div onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })}
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "0.7rem", borderRadius: 10, border: `1.5px solid ${C.border}`, background: "white", cursor: "pointer", transition: "border-color 0.15s" }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = C.sky}
+      onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+    >
+      <div style={{ width: 38, height: 38, borderRadius: "50%", background: `linear-gradient(135deg, ${C.sky}, ${C.ocean})`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
+        <svg viewBox="0 0 38 38" width="38" height="38" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="19" cy="14" r="8" fill="rgba(255,255,255,0.85)" />
+          <ellipse cx="19" cy="32" rx="12" ry="8" fill="rgba(255,255,255,0.85)" />
+        </svg>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, color: C.deep, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{doc.name}</div>
+        <div style={{ fontSize: 11, color: C.ocean }}>{doc.specialty}</div>
+      </div>
+      <span style={{ fontSize: 12, color: C.muted }}>→</span>
+    </div>
+  );
 }
 
 export default function Profile() {
@@ -159,6 +172,7 @@ export default function Profile() {
   const [showReportForm, setShowReportForm] = useState(false);
   const [doc, setDoc] = useState(location.state?.doc || null);
   const [loading, setLoading] = useState(!doc);
+  const [nearbyProviders, setNearbyProviders] = useState([]);
 
   useEffect(() => {
     if (doc) return;
@@ -175,6 +189,25 @@ export default function Profile() {
     }
     fetchDoc();
   }, [id, doc]);
+
+  // Fetch providers at the same address once doc loads
+  useEffect(() => {
+    if (!doc?.address || !doc?.city) return;
+    async function fetchNearby() {
+      try {
+        const res = await fetch(`/api/search?city=${encodeURIComponent(doc.city)}&limit=20`);
+        const data = await res.json();
+        const others = (data.results || []).filter(p =>
+          p.npi !== doc.npi &&
+          p.address?.toLowerCase() === doc.address?.toLowerCase()
+        );
+        setNearbyProviders(others.slice(0, 6));
+      } catch (e) {
+        // silently fail — not critical
+      }
+    }
+    fetchNearby();
+  }, [doc]);
 
   function handlePhotoUpload(e) {
     const file = e.target.files[0];
@@ -204,7 +237,6 @@ export default function Profile() {
     </div>
   );
 
-  const initials = doc.name.replace(/Dr\.\s*/, "").split(" ").filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const isVerified = doc.verified;
 
   return (
@@ -225,9 +257,7 @@ export default function Profile() {
 
           {/* Avatar */}
           <div style={{ position: "relative", flexShrink: 0 }}>
-            <div style={{ width: isMobile ? 80 : 100, height: isMobile ? 80 : 100, borderRadius: "50%", overflow: "hidden", background: photo ? "transparent" : "rgba(255,255,255,0.15)", border: "3px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif", fontWeight: 700, fontSize: isMobile ? 24 : 32, color: "white" }}>
-              {photo ? <img src={photo} alt={doc.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}
-            </div>
+            <DoctorAvatar size={isMobile ? 80 : 100} photo={photo} name={doc.name} />
             {isVerified && (
               <label title="Update photo" style={{ position: "absolute", bottom: 2, right: 2, width: 26, height: 26, borderRadius: "50%", background: C.dusk, border: "2px solid white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 12 }}>
                 📷<input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: "none" }} />
@@ -242,7 +272,6 @@ export default function Profile() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {doc.accepting === true && <Badge icon="✅" text="Accepting New Patients" green />}
               {doc.accepting === false && <Badge icon="❌" text="Not Accepting" red />}
-              {doc.accepting === null && <Badge icon="❓" text="Availability Not Reported" />}
               {doc.telehealth === true && <Badge icon="💻" text="Telehealth Available" blue />}
               {isVerified && <Badge icon="🏅" text="Verified Listing" blue />}
               {doc.gender === "F" && <Badge icon="👩‍⚕️" text="Female Provider" />}
@@ -250,7 +279,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* CTAs */}
+          {/* Desktop CTAs */}
           {!isMobile && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
               {doc.phone && doc.phone !== "Call for number" && (
@@ -258,7 +287,7 @@ export default function Profile() {
               )}
               {!isVerified && (
                 <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", textAlign: "center", fontStyle: "italic" }}>
-                  Provider: <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => navigate("/claim")}>add your booking link →</span>
+                  Provider: <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => navigate("/pricing")}>add your booking link →</span>
                 </div>
               )}
             </div>
@@ -308,17 +337,25 @@ export default function Profile() {
                 <ClaimNudge navigate={navigate} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {[
-                  { label: "Accepting New Patients" },
-                  { label: "Telehealth Available" },
-                  { label: "Insurance Accepted" },
-                  { label: "Languages Spoken" },
-                  { label: "Office Hours" },
-                ].map(({ label }) => (
+                {["Accepting New Patients","Telehealth Available","Insurance Accepted","Languages Spoken","Office Hours"].map(label => (
                   <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.7rem 0", borderBottom: `1px solid ${C.border}` }}>
                     <span style={{ fontSize: 14, color: C.text, fontWeight: 500 }}>{label}</span>
                     <span style={{ fontSize: 12, color: C.muted, fontStyle: "italic" }}>Not yet reported</span>
                   </div>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {/* Providers at this address */}
+          {nearbyProviders.length > 0 && (
+            <Section title={`Other Providers at This Address`}>
+              <div style={{ fontSize: 13, color: C.muted, marginBottom: "0.8rem" }}>
+                Other licensed providers at {doc.address}, {doc.city}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "0.6rem" }}>
+                {nearbyProviders.map(p => (
+                  <NearbyProviderCard key={p.npi} doc={p} navigate={navigate} />
                 ))}
               </div>
             </Section>
@@ -362,16 +399,12 @@ export default function Profile() {
                   <GoogleMap address={doc.address} city={doc.city} />
                 </div>
               )}
-              <a
-                href={`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ display: "block", textAlign: "center", fontSize: 12, color: C.ocean, marginTop: 8 }}
-              >
+              <a href={`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`} target="_blank" rel="noreferrer"
+                style={{ display: "block", textAlign: "center", fontSize: 12, color: C.ocean, marginTop: 8 }}>
                 Open in Google Maps ↗
               </a>
               {!isVerified && (
-                <button onClick={() => navigate("/claim")} style={{ width: "100%", marginTop: "1rem", background: C.ocean, color: "white", border: "none", padding: "0.65rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={() => navigate("/pricing")} style={{ width: "100%", marginTop: "1rem", background: C.ocean, color: "white", border: "none", padding: "0.65rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   🏥 Claim This Listing
                 </button>
               )}
@@ -399,16 +432,12 @@ export default function Profile() {
                 <GoogleMap address={doc.address} city={doc.city} />
               </div>
             )}
-            <a
-              href={`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: "block", textAlign: "center", fontSize: 12, color: C.ocean, marginTop: 8 }}
-            >
+            <a href={`https://maps.google.com/?q=${encodeURIComponent(`${doc.address}, ${doc.city}, CA`)}`} target="_blank" rel="noreferrer"
+              style={{ display: "block", textAlign: "center", fontSize: 12, color: C.ocean, marginTop: 8 }}>
               Open in Google Maps ↗
             </a>
             {!isVerified && (
-              <button onClick={() => navigate("/claim")} style={{ width: "100%", marginTop: "1rem", background: C.ocean, color: "white", border: "none", padding: "0.65rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={() => navigate("/pricing")} style={{ width: "100%", marginTop: "1rem", background: C.ocean, color: "white", border: "none", padding: "0.65rem", borderRadius: 8, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                 🏥 Claim This Listing
               </button>
             )}
