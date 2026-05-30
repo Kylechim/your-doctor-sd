@@ -2,6 +2,31 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { COLORS as C } from "../data/doctors";
 
+// Generate a SEO-friendly slug from doctor data
+export function makeDocSlug(doc) {
+  const name = (doc.name || "")
+    .replace(/^Dr\.?\s*/i, "")
+    .replace(/,.*$/, "")
+    .trim();
+  const specialty = doc.specialty || "";
+  const city = doc.city || "";
+  const raw = `${name} ${specialty} ${city} ${doc.npi}`;
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim();
+}
+
+// Extract NPI from slug — NPI is always the last segment
+function npiFromSlug(slug) {
+  if (!slug) return null;
+  const parts = slug.split("-");
+  const last = parts[parts.length - 1];
+  return /^\d{10}$/.test(last) ? last : null;
+}
+
 function useIsMobile() {
   const [mobile, setMobile] = useState(window.innerWidth < 660);
   useEffect(() => {
@@ -123,7 +148,6 @@ function GoogleMap({ address, city }) {
   return <div ref={mapRef} style={{ width: "100%", height: "100%", borderRadius: 10 }} />;
 }
 
-// Doctor silhouette SVG avatar
 function DoctorAvatar({ size = 100, photo, name }) {
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", background: photo ? "transparent" : "rgba(255,255,255,0.15)", border: "3px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -140,10 +164,9 @@ function DoctorAvatar({ size = 100, photo, name }) {
   );
 }
 
-// Small card for providers at the same address
 function NearbyProviderCard({ doc, navigate }) {
   return (
-    <div onClick={() => navigate(`/doctor/${doc.npi}`, { state: { doc } })}
+    <div onClick={() => navigate(`/doctor/${makeDocSlug(doc)}`, { state: { doc } })}
       style={{ display: "flex", alignItems: "center", gap: 10, padding: "0.7rem", borderRadius: 10, border: `1.5px solid ${C.border}`, background: "white", cursor: "pointer", transition: "border-color 0.15s" }}
       onMouseEnter={e => e.currentTarget.style.borderColor = C.sky}
       onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
@@ -164,7 +187,7 @@ function NearbyProviderCard({ doc, navigate }) {
 }
 
 export default function Profile() {
-  const { id } = useParams();
+  const { slug } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -174,11 +197,18 @@ export default function Profile() {
   const [loading, setLoading] = useState(!doc);
   const [nearbyProviders, setNearbyProviders] = useState([]);
 
+  // Extract NPI from slug
+  const npi = npiFromSlug(slug);
+
   useEffect(() => {
     if (doc) return;
     async function fetchDoc() {
       try {
-        const res = await fetch(`/api/search?name=${id}&limit=1`);
+        // Use NPI from slug if available, otherwise fall back to full slug search
+        const query = npi
+          ? `/api/search?name=${npi}&limit=1`
+          : `/api/search?name=${slug}&limit=1`;
+        const res = await fetch(query);
         const data = await res.json();
         if (data.results?.length > 0) setDoc(data.results[0]);
       } catch (e) {
@@ -188,9 +218,18 @@ export default function Profile() {
       }
     }
     fetchDoc();
-  }, [id, doc]);
+  }, [slug, npi, doc]);
 
-  // Fetch providers at the same address once doc loads
+  // Redirect to canonical SEO slug URL if we arrived via old NPI-only URL
+  useEffect(() => {
+    if (!doc) return;
+    const canonicalSlug = makeDocSlug(doc);
+    if (slug !== canonicalSlug) {
+      navigate(`/doctor/${canonicalSlug}`, { replace: true, state: { doc } });
+    }
+  }, [doc, slug]);
+
+  // Fetch providers at the same address
   useEffect(() => {
     if (!doc?.address || !doc?.city) return;
     async function fetchNearby() {
@@ -202,9 +241,7 @@ export default function Profile() {
           p.address?.toLowerCase() === doc.address?.toLowerCase()
         );
         setNearbyProviders(others.slice(0, 6));
-      } catch (e) {
-        // silently fail — not critical
-      }
+      } catch (e) { /* silently fail */ }
     }
     fetchNearby();
   }, [doc]);
@@ -242,6 +279,9 @@ export default function Profile() {
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", background: C.bg, minHeight: "100vh" }}>
 
+      {/* SEO meta-like title update */}
+      {doc && (typeof document !== "undefined") && (() => { document.title = `${doc.name} — ${doc.specialty} in ${doc.city}, CA | Your Doctor SD`; return null; })()}
+
       {/* NAV */}
       <nav style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(253,250,245,0.97)", backdropFilter: "blur(12px)", borderBottom: `1px solid rgba(26,107,138,0.12)`, padding: "0.8rem 1.2rem", display: "flex", alignItems: "center", gap: "1rem" }}>
         <div onClick={() => navigate("/")} style={{ fontFamily: "Georgia, serif", fontSize: isMobile ? 16 : 18, color: C.ocean, fontWeight: 700, cursor: "pointer" }}>
@@ -255,7 +295,6 @@ export default function Profile() {
         <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: "radial-gradient(circle at 20% 80%, #4db8d4 0%, transparent 50%), radial-gradient(circle at 80% 20%, #a8d8bc 0%, transparent 50%)" }} />
         <div style={{ maxWidth: 900, margin: "0 auto", position: "relative", zIndex: 1, display: "flex", gap: isMobile ? "1rem" : "1.8rem", alignItems: "flex-start", flexWrap: isMobile ? "wrap" : "nowrap" }}>
 
-          {/* Avatar */}
           <div style={{ position: "relative", flexShrink: 0 }}>
             <DoctorAvatar size={isMobile ? 80 : 100} photo={photo} name={doc.name} />
             {isVerified && (
@@ -265,7 +304,6 @@ export default function Profile() {
             )}
           </div>
 
-          {/* Info */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: isMobile ? 22 : 28, fontFamily: "Georgia, serif", fontWeight: 700, marginBottom: 4, lineHeight: 1.2 }}>{doc.name}</div>
             <div style={{ fontSize: isMobile ? 14 : 16, opacity: 0.85, marginBottom: 12 }}>{doc.specialty} · {doc.city}, CA</div>
@@ -279,7 +317,6 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Desktop CTAs */}
           {!isMobile && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
               {doc.phone && doc.phone !== "Call for number" && (
@@ -294,7 +331,6 @@ export default function Profile() {
           )}
         </div>
 
-        {/* Mobile CTAs */}
         {isMobile && (
           <div style={{ maxWidth: 900, margin: "1.2rem auto 0", display: "flex", gap: 8 }}>
             {doc.phone && doc.phone !== "Call for number" && (
@@ -347,9 +383,8 @@ export default function Profile() {
             </Section>
           )}
 
-          {/* Providers at this address */}
           {nearbyProviders.length > 0 && (
-            <Section title={`Other Providers at This Address`}>
+            <Section title="Other Providers at This Address">
               <div style={{ fontSize: 13, color: C.muted, marginBottom: "0.8rem" }}>
                 Other licensed providers at {doc.address}, {doc.city}
               </div>
@@ -361,7 +396,6 @@ export default function Profile() {
             </Section>
           )}
 
-          {/* Community Reports */}
           <Section title="Community Updates">
             <div style={{ fontSize: 13, color: C.muted, marginBottom: "0.8rem" }}>Real updates from San Diego patients — not paid reviews.</div>
             <div style={{ color: C.muted, fontSize: 13, fontStyle: "italic", padding: "1rem 0" }}>No community reports yet for this provider.</div>
@@ -378,7 +412,6 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Desktop Sidebar */}
         {!isMobile && (
           <aside style={{ width: 240, flexShrink: 0 }}>
             <div style={{ background: "white", border: `1.5px solid ${C.border}`, borderRadius: 14, padding: "1.2rem", marginBottom: "1rem", position: "sticky", top: 72 }}>
@@ -413,7 +446,6 @@ export default function Profile() {
         )}
       </div>
 
-      {/* Mobile Location */}
       {isMobile && (
         <div style={{ padding: "0 1rem 2rem" }}>
           <Section title="Contact & Location">
