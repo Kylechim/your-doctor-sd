@@ -94,7 +94,7 @@ function formatPhone(phone) {
   return phone;
 }
 
-function buildDoctor(row, claimed) {
+function buildDoctor(row, claimed, reportCount) {
   const firstName = toProperCase(row.first_name || '');
   const lastName = toProperCase(row.last_name || '');
   const credential = (row.credential || 'MD').replace(/\.$/, '');
@@ -117,6 +117,7 @@ function buildDoctor(row, claimed) {
     photo_url: claimed?.photo_url ?? null,
     bio: claimed?.bio ?? null,
     verified: claimed ? true : false,
+    reportCount: reportCount || 0,
   };
 }
 
@@ -154,10 +155,7 @@ export default async function handler(req, res) {
       .range(pageOffset, pageOffset + pageLimit - 1);
 
     const resolvedSpecialty = resolveSpecialty(specialty);
-
-    if (resolvedSpecialty) {
-      query = query.ilike('specialty', `%${resolvedSpecialty}%`);
-    }
+    if (resolvedSpecialty) query = query.ilike('specialty', `%${resolvedSpecialty}%`);
 
     if (name) {
       const cleanName = name.replace(/^dr\.?\s*/i, '').trim();
@@ -165,13 +163,9 @@ export default async function handler(req, res) {
       if (parts.length >= 2) {
         const first = parts[0];
         const last = parts.slice(1).join(' ');
-        query = query.or(
-          `first_name.ilike.%${first}%,last_name.ilike.%${last}%,first_name.ilike.%${last}%,last_name.ilike.%${first}%`
-        );
+        query = query.or(`first_name.ilike.%${first}%,last_name.ilike.%${last}%,first_name.ilike.%${last}%,last_name.ilike.%${first}%`);
       } else {
-        query = query.or(
-          `first_name.ilike.%${cleanName}%,last_name.ilike.%${cleanName}%`
-        );
+        query = query.or(`first_name.ilike.%${cleanName}%,last_name.ilike.%${cleanName}%`);
       }
     }
 
@@ -183,26 +177,19 @@ export default async function handler(req, res) {
         .range(pageOffset, pageOffset + pageLimit - 1);
     }
 
-    if (city && city !== 'All of San Diego') {
-      query = query.ilike('city', city);
-    }
-
-    if (gender && gender !== '') {
-      query = query.eq('gender', gender);
-    }
-
-    if (!name) {
-      query = query.order('last_name', { ascending: true });
-    }
+    if (city && city !== 'All of San Diego') query = query.ilike('city', city);
+    if (gender && gender !== '') query = query.eq('gender', gender);
+    if (!name) query = query.order('last_name', { ascending: true });
 
     const { data: providers, error, count } = await query;
-
     if (error) throw error;
 
     const npis = (providers || []).map(p => p.npi);
     let claimedMap = {};
+    let reportCountMap = {};
 
     if (npis.length > 0) {
+      // Fetch claimed listings
       const { data: claimed } = await supabase
         .from('claimed_listings')
         .select('*')
@@ -212,11 +199,25 @@ export default async function handler(req, res) {
       if (claimed) {
         claimedMap = Object.fromEntries(claimed.map(c => [c.npi, c]));
       }
+
+      // Fetch community report counts for this batch
+      const { data: reportCounts } = await supabase
+        .from('community_reports')
+        .select('npi')
+        .in('npi', npis);
+
+      if (reportCounts) {
+        for (const r of reportCounts) {
+          reportCountMap[r.npi] = (reportCountMap[r.npi] || 0) + 1;
+        }
+      }
     }
 
-    let results = (providers || []).map(p => buildDoctor(p, claimedMap[p.npi]));
+    let results = (providers || []).map(p =>
+      buildDoctor(p, claimedMap[p.npi], reportCountMap[p.npi] || 0)
+    );
 
-    // Sort name results by relevance — first name matches first
+    // Sort name results by relevance
     if (name) {
       const cleanName = name.replace(/^dr\.?\s*/i, '').trim();
       const parts = cleanName.split(/\s+/).filter(Boolean);
