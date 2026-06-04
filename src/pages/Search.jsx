@@ -204,6 +204,7 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
         {doc.verified && <Pill icon="🏅" text="Verified" blue />}
         {doc.gender === "F" && <Pill icon="👩‍⚕️" text="Female" />}
         {doc.gender === "M" && <Pill icon="👨‍⚕️" text="Male" />}
+        {doc.reportCount > 0 && <Pill icon="💬" text={`${doc.reportCount} report${doc.reportCount !== 1 ? "s" : ""}`} />}
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.6rem" }}>
         <div style={{ fontSize: 10, color: "#9ab5bf" }}>📋 {doc.address}{doc.address && ", "}{doc.city} · NPI {doc.npi}</div>
