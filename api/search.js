@@ -94,7 +94,7 @@ function formatPhone(phone) {
   return phone;
 }
 
-function buildDoctor(row, claimed, reportCount) {
+function buildDoctor(row, claimed, reportCount, avgRating) {
   const firstName = toProperCase(row.first_name || '');
   const lastName = toProperCase(row.last_name || '');
   const credential = (row.credential || 'MD').replace(/\.$/, '');
@@ -118,6 +118,7 @@ function buildDoctor(row, claimed, reportCount) {
     bio: claimed?.bio ?? null,
     verified: claimed ? true : false,
     reportCount: reportCount || 0,
+    avgRating: avgRating || null,
   };
 }
 
@@ -187,6 +188,7 @@ export default async function handler(req, res) {
     const npis = (providers || []).map(p => p.npi);
     let claimedMap = {};
     let reportCountMap = {};
+    let avgRatingMap = {};
 
     if (npis.length > 0) {
       // Fetch claimed listings
@@ -200,21 +202,31 @@ export default async function handler(req, res) {
         claimedMap = Object.fromEntries(claimed.map(c => [c.npi, c]));
       }
 
-      // Fetch community report counts for this batch
-      const { data: reportCounts } = await supabase
+      // Fetch community reports — count and average rating per NPI
+      const { data: reportData } = await supabase
         .from('community_reports')
-        .select('npi')
+        .select('npi, rating')
         .in('npi', npis);
 
-      if (reportCounts) {
-        for (const r of reportCounts) {
-          reportCountMap[r.npi] = (reportCountMap[r.npi] || 0) + 1;
+      if (reportData) {
+        // Group by NPI to compute count and average rating
+        const grouped = {};
+        for (const r of reportData) {
+          if (!grouped[r.npi]) grouped[r.npi] = { count: 0, ratings: [] };
+          grouped[r.npi].count++;
+          if (r.rating != null) grouped[r.npi].ratings.push(r.rating);
+        }
+        for (const [npi, { count: c, ratings }] of Object.entries(grouped)) {
+          reportCountMap[npi] = c;
+          if (ratings.length > 0) {
+            avgRatingMap[npi] = Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10;
+          }
         }
       }
     }
 
     let results = (providers || []).map(p =>
-      buildDoctor(p, claimedMap[p.npi], reportCountMap[p.npi] || 0)
+      buildDoctor(p, claimedMap[p.npi], reportCountMap[p.npi] || 0, avgRatingMap[p.npi] || null)
     );
 
     // Sort name results by relevance
