@@ -6,14 +6,12 @@ const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
 const PAGE_SIZE = 20;
 
-// Generate SEO-friendly slug — must match Profile.jsx
 function makeDocSlug(doc) {
   const name = (doc.name || "").replace(/^Dr\.?\s*/i, "").replace(/,.*$/, "").trim();
   const raw = `${name} ${doc.specialty || ""} ${doc.city || ""} ${doc.npi}`;
   return raw.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
 }
 
-// Star display for search cards
 function Stars({ rating, size = 12 }) {
   return (
     <span style={{ display: "inline-flex", gap: 1, alignItems: "center" }}>
@@ -423,6 +421,7 @@ export default function Search() {
   const [showFilters, setShowFilters] = useState(false);
   const [showMap, setShowMap] = useState(true);
   const [highlightedNpi, setHighlightedNpi] = useState(null);
+  const [nearMeLoading, setNearMeLoading] = useState(false);
   const cardRefs = useRef({});
   const highlightFnRef = useRef(null);
   const mapViewFnRef = useRef(null);
@@ -520,6 +519,51 @@ export default function Search() {
       .finally(() => setLoading(false));
   }
 
+  // Find closest SD neighborhood to given coordinates
+  function findNearestNeighborhood(lat, lng) {
+    let closest = "San Diego";
+    let minDist = Infinity;
+    for (const [name, coords] of Object.entries(NEIGHBORHOOD_COORDS)) {
+      if (name === "All of San Diego") continue;
+      const d = Math.sqrt(Math.pow(lat - coords.lat, 2) + Math.pow(lng - coords.lng, 2));
+      if (d < minDist) { minDist = d; closest = name; }
+    }
+    return closest;
+  }
+
+  function handleNearMe() {
+    if (!navigator.geolocation) return;
+    setNearMeLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        const nearest = findNearestNeighborhood(lat, lng);
+        setNeighborhood(nearest);
+        setLoading(true); setError(""); setResults([]); setTotal(0); setOffset(0); setHasMore(false);
+        const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: nearest, offset: 0 });
+        fetch(`/api/search?${params.toString()}`)
+          .then(r => r.json())
+          .then(data => {
+            const filtered = applyClientFilters(data.results || [], { gender, accepting, telehealth, selectedLangs });
+            setResults(filtered);
+            setMapDoctors(filtered.slice(0, PAGE_SIZE));
+            setTotal(data.total || 0);
+            setOffset(PAGE_SIZE);
+            setHasMore(data.hasMore || false);
+            // Zoom map to user's exact location
+            setTimeout(() => { if (mapViewFnRef.current) mapViewFnRef.current({ lat, lng, zoom: 13 }); }, 100);
+          })
+          .catch(e => setError(e.message || "Something went wrong."))
+          .finally(() => { setLoading(false); setNearMeLoading(false); });
+      },
+      () => {
+        setNearMeLoading(false);
+        alert("Could not get your location. Please enable location access in your browser.");
+      },
+      { timeout: 8000 }
+    );
+  }
+
   const sortedResults = useMemo(() => {
     if (sort === "smart") return smartSort(results);
     if (sort === "name") return [...results].sort((a, b) => a.name.localeCompare(b.name));
@@ -548,6 +592,14 @@ export default function Search() {
         <div style={{ display: "flex", gap: "0.5rem", marginTop: isMobile ? "0.6rem" : 0 }}>
           <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && fetchDoctors()} placeholder="Search by specialty or doctor name…" style={{ flex: 1, padding: "0.55rem 0.9rem", border: `1.5px solid ${C.border}`, borderRadius: 8, fontFamily: "inherit", fontSize: isMobile ? 14 : 13, outline: "none", background: "white", maxWidth: isMobile ? "none" : 340 }} />
           <button onClick={fetchDoctors} style={{ background: C.ocean, color: "white", border: "none", padding: "0.55rem 0.9rem", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>🔍</button>
+          <button
+            onClick={handleNearMe}
+            disabled={nearMeLoading}
+            title="Find doctors near me"
+            style={{ background: nearMeLoading ? "#e8f4f7" : "white", color: C.ocean, border: `1.5px solid ${C.border}`, padding: "0.55rem 0.75rem", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: nearMeLoading ? "default" : "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}
+          >
+            {nearMeLoading ? "…" : "📍"}{!isMobile && <span style={{ fontSize: 12 }}>Near Me</span>}
+          </button>
           {isMobile && <button onClick={() => setShowFilters(true)} style={{ background: activeFilterCount > 0 ? C.ocean : "white", color: activeFilterCount > 0 ? "white" : C.ocean, border: `1.5px solid ${activeFilterCount > 0 ? C.ocean : C.border}`, padding: "0.55rem 0.9rem", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
             ⚙️{activeFilterCount > 0 && <span style={{ background: C.dusk, color: "white", borderRadius: "50%", width: 18, height: 18, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>{activeFilterCount}</span>}
           </button>}
