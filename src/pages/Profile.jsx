@@ -28,6 +28,25 @@ function useIsMobile() {
   return mobile;
 }
 
+// Render stars — filled, half, or empty
+function Stars({ rating, size = 14, interactive = false, onRate }) {
+  const [hovered, setHovered] = useState(null);
+  const display = hovered ?? rating ?? 0;
+  return (
+    <div style={{ display: "inline-flex", gap: 2, alignItems: "center" }}>
+      {[1, 2, 3, 4, 5].map(s => (
+        <span
+          key={s}
+          onClick={() => interactive && onRate && onRate(s)}
+          onMouseEnter={() => interactive && setHovered(s)}
+          onMouseLeave={() => interactive && setHovered(null)}
+          style={{ fontSize: size, cursor: interactive ? "pointer" : "default", color: s <= display ? "#f5a623" : "#ddd", transition: "color 0.1s" }}
+        >★</span>
+      ))}
+    </div>
+  );
+}
+
 function Badge({ icon, text, green, red, blue }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, padding: "4px 11px", borderRadius: 20, fontWeight: 500, background: green ? "#edfaf3" : red ? "#fff0f0" : blue ? "rgba(26,107,138,0.08)" : "#f0f8fb", color: green ? "#1a7a4a" : red ? "#c05050" : blue ? C.ocean : C.muted, border: `1px solid ${green ? "#b2e5cc" : red ? "#f5c0c0" : blue ? "rgba(26,107,138,0.2)" : C.border}` }}>
@@ -81,6 +100,7 @@ function timeAgo(dateStr) {
 function ReportForm({ npi, onClose, onSubmitted }) {
   const [text, setText] = useState("");
   const [category, setCategory] = useState("accepting");
+  const [rating, setRating] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -96,7 +116,7 @@ function ReportForm({ npi, onClose, onSubmitted }) {
           "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
           "Prefer": "return=minimal",
         },
-        body: JSON.stringify({ npi, category, message: text || null }),
+        body: JSON.stringify({ npi, category, message: text || null, rating: rating || null }),
       });
       if (!res.ok) throw new Error("Failed to submit");
       setSubmitted(true);
@@ -121,6 +141,21 @@ function ReportForm({ npi, onClose, onSubmitted }) {
     <div>
       <div style={{ fontWeight: 700, fontSize: 16, color: C.deep, marginBottom: 4 }}>Share an Update</div>
       <div style={{ fontSize: 13, color: C.muted, marginBottom: 14 }}>Help other San Diego patients with accurate, current info.</div>
+
+      {/* Star rating */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: C.deep, marginBottom: 6 }}>Overall rating (optional)</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Stars rating={rating} size={28} interactive onRate={setRating} />
+          {rating && (
+            <span style={{ fontSize: 12, color: C.muted }}>
+              {["", "Poor", "Fair", "Good", "Very Good", "Excellent"][rating]}
+              <button onClick={() => setRating(null)} style={{ marginLeft: 8, background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 11, textDecoration: "underline", padding: 0 }}>clear</button>
+            </span>
+          )}
+        </div>
+      </div>
+
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: C.deep, marginBottom: 5 }}>What are you reporting?</div>
         {[["accepting","Accepting / not accepting new patients"],["telehealth","Telehealth availability"],["hours","Office hours update"],["insurance","Insurance acceptance"],["other","Something else"]].map(([val,label]) => (
@@ -291,6 +326,12 @@ export default function Profile() {
     reader.readAsDataURL(file);
   }
 
+  // Compute average rating from loaded reports
+  const ratingsOnly = reports.filter(r => r.rating != null).map(r => r.rating);
+  const avgRating = ratingsOnly.length > 0
+    ? Math.round((ratingsOnly.reduce((a, b) => a + b, 0) / ratingsOnly.length) * 10) / 10
+    : null;
+
   if (loading) return (
     <div style={{ fontFamily: "system-ui, sans-serif", background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ textAlign: "center" }}>
@@ -335,7 +376,17 @@ export default function Profile() {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: isMobile ? 22 : 28, fontFamily: "Georgia, serif", fontWeight: 700, marginBottom: 4, lineHeight: 1.2 }}>{doc.name}</div>
-            <div style={{ fontSize: isMobile ? 14 : 16, opacity: 0.85, marginBottom: 12 }}>{doc.specialty} · {doc.city}, CA</div>
+            <div style={{ fontSize: isMobile ? 14 : 16, opacity: 0.85, marginBottom: avgRating ? 6 : 12 }}>{doc.specialty} · {doc.city}, CA</div>
+
+            {/* Average rating display */}
+            {avgRating && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <Stars rating={Math.round(avgRating)} size={16} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: "white" }}>{avgRating}</span>
+                <span style={{ fontSize: 12, opacity: 0.7 }}>({ratingsOnly.length} rating{ratingsOnly.length !== 1 ? "s" : ""})</span>
+              </div>
+            )}
+
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {doc.accepting === true && <Badge icon="✅" text="Accepting New Patients" green />}
               {doc.accepting === false && <Badge icon="❌" text="Not Accepting" red />}
@@ -409,7 +460,6 @@ export default function Profile() {
             </Section>
           )}
 
-          {/* Community Reports */}
           <Section title={`Community Updates${reports.length > 0 ? ` (${reports.length})` : ""}`}>
             <div style={{ fontSize: 13, color: C.muted, marginBottom: "1rem" }}>Real updates from San Diego patients — not paid reviews.</div>
 
@@ -419,12 +469,13 @@ export default function Profile() {
               <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem", marginBottom: "1.2rem" }}>
                 {reports.map(r => (
                   <div key={r.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "0.9rem 1rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: r.message ? 6 : 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: (r.message || r.rating) ? 6 : 0 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: C.ocean, background: "rgba(26,107,138,0.08)", padding: "2px 8px", borderRadius: 20, border: "1px solid rgba(26,107,138,0.15)" }}>
                         {CATEGORY_LABELS[r.category] || r.category}
                       </span>
                       <span style={{ fontSize: 11, color: C.muted }}>{timeAgo(r.created_at)}</span>
                     </div>
+                    {r.rating && <div style={{ marginBottom: r.message ? 4 : 0 }}><Stars rating={r.rating} size={13} /></div>}
                     {r.message && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{r.message}</div>}
                   </div>
                 ))}
