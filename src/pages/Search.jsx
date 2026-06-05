@@ -13,6 +13,17 @@ function makeDocSlug(doc) {
   return raw.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
 }
 
+// Star display for search cards
+function Stars({ rating, size = 12 }) {
+  return (
+    <span style={{ display: "inline-flex", gap: 1, alignItems: "center" }}>
+      {[1, 2, 3, 4, 5].map(s => (
+        <span key={s} style={{ fontSize: size, color: s <= Math.round(rating) ? "#f5a623" : "#ddd", lineHeight: 1 }}>★</span>
+      ))}
+    </span>
+  );
+}
+
 const NEIGHBORHOOD_COORDS = {
   "All of San Diego": { lat: 32.8, lng: -117.1, zoom: 10 },
   "San Diego": { lat: 32.7157, lng: -117.1611, zoom: 12 },
@@ -205,6 +216,11 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
         {doc.gender === "F" && <Pill icon="👩‍⚕️" text="Female" />}
         {doc.gender === "M" && <Pill icon="👨‍⚕️" text="Male" />}
         {doc.reportCount > 0 && <Pill icon="💬" text={`${doc.reportCount} report${doc.reportCount !== 1 ? "s" : ""}`} />}
+        {doc.avgRating && (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, padding: "3px 9px", borderRadius: 20, fontWeight: 600, background: "#fffbf0", color: "#9a6c00", border: "1px solid #f5d78e", whiteSpace: "nowrap" }}>
+            <Stars rating={doc.avgRating} size={11} />&nbsp;{doc.avgRating}
+          </span>
+        )}
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.6rem" }}>
         <div style={{ fontSize: 10, color: "#9ab5bf" }}>📋 {doc.address}{doc.address && ", "}{doc.city} · NPI {doc.npi}</div>
@@ -255,11 +271,8 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef,
     function initMap() {
       if (!mapRef.current || !window.google?.maps) return;
       const map = new window.google.maps.Map(mapRef.current, {
-        zoom: 10,
-        center: { lat: 32.8, lng: -117.1 },
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
+        zoom: 10, center: { lat: 32.8, lng: -117.1 },
+        mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
       });
       mapInstanceRef.current = map;
       infoWindowRef.current = new window.google.maps.InfoWindow();
@@ -282,14 +295,11 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef,
     markersRef.current.forEach(m => m.setMap(null));
     markersRef.current = [];
     prevNpiRef.current = null;
-
     const geocoder = new window.google.maps.Geocoder();
 
     function placeMarker(doc, index, position) {
       const marker = new window.google.maps.Marker({
-        map: mapInstanceRef.current,
-        position,
-        title: doc.name,
+        map: mapInstanceRef.current, position, title: doc.name,
         icon: { path: window.google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: C.ocean, fillOpacity: 1, strokeColor: "white", strokeWeight: 2.5 },
       });
       marker._npi = doc.npi;
@@ -313,10 +323,7 @@ const SearchMap = memo(function SearchMap({ doctors, onPinClick, highlightFnRef,
     doctors.forEach((doc, index) => {
       if (!doc.address || !doc.city) return;
       const cacheKey = `${doc.address},${doc.city}`;
-      if (geocodeCache[cacheKey]) {
-        placeMarker(doc, index, geocodeCache[cacheKey]);
-        return;
-      }
+      if (geocodeCache[cacheKey]) { placeMarker(doc, index, geocodeCache[cacheKey]); return; }
       geocoder.geocode({ address: `${doc.address}, ${doc.city}, CA` }, (results, status) => {
         if (status !== "OK" || !results[0] || !mapInstanceRef.current) return;
         const position = results[0].geometry.location;
