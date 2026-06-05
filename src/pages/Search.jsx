@@ -531,6 +531,11 @@ export default function Search() {
     return closest;
   }
 
+  // Neighborhoods that are sub-areas of San Diego city — NPI stores them as "San Diego"
+  const SD_CITY_NEIGHBORHOODS = new Set([
+    "Pacific Beach", "Mission Valley", "Hillcrest", "North Park", "Kearny Mesa", "Mira Mesa"
+  ]);
+
   function handleNearMe() {
     if (!navigator.geolocation) return;
     setNearMeLoading(true);
@@ -538,9 +543,11 @@ export default function Search() {
       (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
         const nearest = findNearestNeighborhood(lat, lng);
+        // If it's a San Diego sub-neighborhood, use "San Diego" as the city for NPI lookup
+        const cityForSearch = SD_CITY_NEIGHBORHOODS.has(nearest) ? "San Diego" : nearest;
         setNeighborhood(nearest);
         setLoading(true); setError(""); setResults([]); setTotal(0); setOffset(0); setHasMore(false);
-        const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: nearest, offset: 0 });
+        const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: cityForSearch, offset: 0 });
         fetch(`/api/search?${params.toString()}`)
           .then(r => r.json())
           .then(data => {
