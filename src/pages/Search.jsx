@@ -404,6 +404,7 @@ export default function Search() {
   const [specialtySearch, setSpecialtySearch] = useState(urlQuery);
   const [nameSearch, setNameSearch] = useState("");
   const [neighborhood, setNeighborhood] = useState(searchParams.get("city") || "All of San Diego");
+  const [searchCity, setSearchCity] = useState(searchParams.get("city") || "All of San Diego"); // actual city sent to API
   const [gender, setGender] = useState("");
   const [accepting, setAccepting] = useState(false);
   const [telehealth, setTelehealth] = useState(false);
@@ -428,7 +429,7 @@ export default function Search() {
 
   const fetchDoctors = useCallback(async () => {
     setLoading(true); setError(""); setResults([]); setTotal(0); setOffset(0); setHasMore(false);
-    const params = buildParams({ specialtySearch, nameSearch, query, neighborhood, offset: 0 });
+    const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: searchCity, offset: 0 });
     try {
       const res = await fetch(`/api/search?${params.toString()}`);
       const data = await res.json();
@@ -448,7 +449,7 @@ export default function Search() {
 
   async function loadMore() {
     setLoadingMore(true);
-    const params = buildParams({ specialtySearch, nameSearch, query, neighborhood, offset });
+    const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: searchCity, offset });
     try {
       const res = await fetch(`/api/search?${params.toString()}`);
       const data = await res.json();
@@ -483,6 +484,7 @@ export default function Search() {
   function handleNeighborhoodChange(name) {
     const coords = NEIGHBORHOOD_COORDS[name] || NEIGHBORHOOD_COORDS["All of San Diego"];
     setLoading(true); setError(""); setResults([]); setTotal(0); setOffset(0); setHasMore(false);
+    setSearchCity(name);
     const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: name, offset: 0 });
     fetch(`/api/search?${params.toString()}`)
       .then(r => r.json())
@@ -501,7 +503,7 @@ export default function Search() {
 
   function clearAll() {
     navigate("/search", { replace: true });
-    setQuery(""); setSpecialtySearch(""); setNameSearch(""); setNeighborhood("All of San Diego");
+    setQuery(""); setSpecialtySearch(""); setNameSearch(""); setNeighborhood("All of San Diego"); setSearchCity("All of San Diego");
     setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]);
     setResults([]); setTotal(0); setOffset(0); setHasMore(false);
     if (mapViewFnRef.current) mapViewFnRef.current(NEIGHBORHOOD_COORDS["All of San Diego"]);
@@ -546,6 +548,7 @@ export default function Search() {
         // If it's a San Diego sub-neighborhood, use "San Diego" as the city for NPI lookup
         const cityForSearch = SD_CITY_NEIGHBORHOODS.has(nearest) ? "San Diego" : nearest;
         setNeighborhood(nearest);
+        setSearchCity(cityForSearch);
         setLoading(true); setError(""); setResults([]); setTotal(0); setOffset(0); setHasMore(false);
         const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: cityForSearch, offset: 0 });
         fetch(`/api/search?${params.toString()}`)
