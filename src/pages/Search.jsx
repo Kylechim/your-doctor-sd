@@ -56,7 +56,7 @@ const NEIGHBORHOOD_COORDS = {
 
 const geocodeCache = {};
 
-function buildParams({ specialtySearch, nameSearch, query, neighborhood, offset }) {
+function buildParams({ specialtySearch, nameSearch, query, neighborhood, offset, lat, lng }) {
   const params = new URLSearchParams();
   const searchQuery = specialtySearch || (typeof query === "string" ? query.replace("[object Object]", "") : "");
   const isNameSearch = searchQuery && !specialtySearch && (
@@ -66,7 +66,14 @@ function buildParams({ specialtySearch, nameSearch, query, neighborhood, offset 
   if (nameSearch) params.set("name", nameSearch);
   else if (isNameSearch) params.set("name", searchQuery);
   else if (searchQuery) params.set("specialty", searchQuery);
-  if (neighborhood && neighborhood !== "All of San Diego") params.set("city", neighborhood);
+  // If we have user coords, use lat/lng radius search instead of city
+  if (lat && lng) {
+    params.set("lat", String(lat));
+    params.set("lng", String(lng));
+    params.set("radius", "5");
+  } else if (neighborhood && neighborhood !== "All of San Diego") {
+    params.set("city", neighborhood);
+  }
   params.set("limit", String(PAGE_SIZE));
   params.set("offset", String(offset));
   return params;
@@ -423,13 +430,14 @@ export default function Search() {
   const [showMap, setShowMap] = useState(true);
   const [highlightedNpi, setHighlightedNpi] = useState(null);
   const [nearMeLoading, setNearMeLoading] = useState(false);
+  const [userCoords, setUserCoords] = useState(null); // {lat, lng} set when Near Me used
   const cardRefs = useRef({});
   const highlightFnRef = useRef(null);
   const mapViewFnRef = useRef(null);
 
   const fetchDoctors = useCallback(async () => {
     setLoading(true); setError(""); setResults([]); setTotal(0); setOffset(0); setHasMore(false);
-    const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: searchCity, offset: 0 });
+    const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: searchCity, offset: 0, lat: userCoords?.lat, lng: userCoords?.lng });
     try {
       const res = await fetch(`/api/search?${params.toString()}`);
       const data = await res.json();
@@ -449,7 +457,7 @@ export default function Search() {
 
   async function loadMore() {
     setLoadingMore(true);
-    const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: searchCity, offset });
+    const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: searchCity, offset, lat: userCoords?.lat, lng: userCoords?.lng });
     try {
       const res = await fetch(`/api/search?${params.toString()}`);
       const data = await res.json();
@@ -485,6 +493,7 @@ export default function Search() {
     const coords = NEIGHBORHOOD_COORDS[name] || NEIGHBORHOOD_COORDS["All of San Diego"];
     setLoading(true); setError(""); setResults([]); setTotal(0); setOffset(0); setHasMore(false);
     setSearchCity(name);
+    setUserCoords(null); // clear near me when manually changing neighborhood
     const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: name, offset: 0 });
     fetch(`/api/search?${params.toString()}`)
       .then(r => r.json())
@@ -503,7 +512,7 @@ export default function Search() {
 
   function clearAll() {
     navigate("/search", { replace: true });
-    setQuery(""); setSpecialtySearch(""); setNameSearch(""); setNeighborhood("All of San Diego"); setSearchCity("All of San Diego");
+    setQuery(""); setSpecialtySearch(""); setNameSearch(""); setNeighborhood("All of San Diego"); setSearchCity("All of San Diego"); setUserCoords(null);
     setGender(""); setAccepting(false); setTelehealth(false); setSelectedLangs([]);
     setResults([]); setTotal(0); setOffset(0); setHasMore(false);
     if (mapViewFnRef.current) mapViewFnRef.current(NEIGHBORHOOD_COORDS["All of San Diego"]);
@@ -549,6 +558,7 @@ export default function Search() {
         const cityForSearch = SD_CITY_NEIGHBORHOODS.has(nearest) ? "San Diego" : nearest;
         setNeighborhood(nearest);
         setSearchCity(cityForSearch);
+        setUserCoords({ lat, lng });
         setLoading(true); setError(""); setResults([]); setTotal(0); setOffset(0); setHasMore(false);
         const params = buildParams({ specialtySearch, nameSearch, query, neighborhood: cityForSearch, offset: 0 });
         fetch(`/api/search?${params.toString()}`)
