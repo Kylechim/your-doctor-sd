@@ -12,6 +12,68 @@ function makeDocSlug(doc) {
   return raw.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
 }
 
+// SD zip code centers for distance calculation
+const SD_ZIP_COORDS = {
+  "91901":[32.7448,-116.7664],"91902":[32.6731,-116.9292],"91905":[32.6773,-116.4756],
+  "91906":[32.6154,-116.5423],"91910":[32.6401,-117.0842],"91911":[32.6018,-117.0484],
+  "91913":[32.6232,-117.0284],"91914":[32.6565,-116.9739],"91915":[32.6101,-116.9528],
+  "91916":[32.8107,-116.6364],"91917":[32.5762,-116.8903],"91931":[32.7154,-116.7089],
+  "91932":[32.5673,-117.1231],"91934":[32.5984,-116.4423],"91935":[32.7154,-116.8486],
+  "91941":[32.7678,-117.0228],"91942":[32.7826,-117.0145],"91945":[32.7248,-117.0314],
+  "91946":[32.7448,-117.0089],"91948":[32.8651,-116.5664],"91950":[32.6781,-117.0992],
+  "91962":[32.7651,-116.6089],"91963":[32.5973,-116.6756],"91977":[32.7448,-116.9989],
+  "91978":[32.7248,-116.9314],"91980":[32.5562,-116.6256],"92003":[33.2551,-117.2159],
+  "92004":[33.1484,-116.3756],"92007":[33.0118,-117.2712],"92008":[33.1581,-117.3506],
+  "92009":[33.0951,-117.2712],"92010":[33.1351,-117.3089],"92011":[33.1051,-117.3089],
+  "92014":[32.9595,-117.2653],"92019":[32.7826,-116.9314],"92020":[32.7948,-116.9625],
+  "92021":[32.8284,-116.9314],"92024":[33.0369,-117.2920],"92025":[33.1192,-117.0864],
+  "92026":[33.1651,-117.0645],"92027":[33.1484,-117.0228],"92028":[33.2284,-117.1284],
+  "92029":[33.0751,-117.1284],"92036":[33.0484,-116.5756],"92037":[32.8328,-117.2713],
+  "92040":[32.8576,-116.9225],"92054":[33.1959,-117.3795],"92055":[33.2751,-117.3506],
+  "92056":[33.2151,-117.2712],"92057":[33.2284,-117.3284],"92058":[33.1751,-117.3789],
+  "92059":[33.2984,-117.1145],"92060":[33.3284,-117.0228],"92061":[33.2484,-116.9739],
+  "92064":[32.9628,-117.0359],"92065":[33.0151,-116.8645],"92066":[33.2984,-116.7089],
+  "92067":[33.0234,-117.1987],"92069":[33.1434,-117.1661],"92070":[33.1151,-116.7756],
+  "92071":[32.8284,-117.0228],"92074":[33.0151,-117.0284],"92075":[32.9912,-117.2712],
+  "92078":[33.1284,-117.1987],"92081":[33.1784,-117.2284],"92082":[33.2151,-117.0645],
+  "92083":[33.1951,-117.2489],"92084":[33.2151,-117.2059],"92086":[33.3651,-116.8645],
+  "92091":[33.0234,-117.1987],"92092":[32.8751,-117.2284],"92093":[32.8784,-117.2359],
+  "92096":[33.1284,-117.1645],"92101":[32.7157,-117.1611],"92102":[32.7051,-117.1284],
+  "92103":[32.7467,-117.1600],"92104":[32.7478,-117.1298],"92105":[32.7284,-117.0939],
+  "92106":[32.7151,-117.2284],"92107":[32.7384,-117.2512],"92108":[32.7674,-117.1485],
+  "92109":[32.7965,-117.2358],"92110":[32.7651,-117.2059],"92111":[32.8051,-117.1645],
+  "92113":[32.6851,-117.1284],"92114":[32.6951,-117.0645],"92115":[32.7451,-117.0784],
+  "92116":[32.7551,-117.1284],"92117":[32.8151,-117.2059],"92118":[32.6684,-117.1612],
+  "92119":[32.7951,-117.0284],"92120":[32.7851,-117.0645],"92121":[32.8951,-117.2284],
+  "92122":[32.8584,-117.2059],"92123":[32.8051,-117.1284],"92124":[32.8284,-117.0939],
+  "92126":[32.9151,-117.1645],"92127":[33.0151,-117.1284],"92128":[33.0451,-117.0784],
+  "92129":[32.9584,-117.1284],"92130":[32.9284,-117.2284],"92131":[32.9151,-117.0784],
+  "92132":[32.7151,-117.1987],"92134":[32.7251,-117.1512],"92136":[32.6784,-117.1512],
+  "92139":[32.6751,-117.0645],"92140":[32.7384,-117.2059],"92145":[32.8851,-117.1512],
+  "92154":[32.5551,-117.0284],"92173":[32.5584,-117.0512],
+};
+
+function haversineClient(lat1, lon1, lat2, lon2) {
+  const R = 3958.8;
+  const dlat = (lat2-lat1)*Math.PI/180;
+  const dlon = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dlat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dlon/2)**2;
+  return R*2*Math.asin(Math.sqrt(a));
+}
+
+function getDistanceMiles(userLat, userLng, zip) {
+  const coords = SD_ZIP_COORDS[zip];
+  if (!coords) return null;
+  return haversineClient(userLat, userLng, coords[0], coords[1]);
+}
+
+function formatDistance(miles) {
+  if (miles === null) return null;
+  if (miles < 0.1) return "< 0.1 mi";
+  if (miles < 10) return `${miles.toFixed(1)} mi`;
+  return `${Math.round(miles)} mi`;
+}
+
 function Stars({ rating, size = 12 }) {
   return (
     <span style={{ display: "inline-flex", gap: 1, alignItems: "center" }}>
@@ -176,7 +238,7 @@ function Spinner({ small }) {
   );
 }
 
-function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
+function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef, userCoords }) {
   const navigate = useNavigate();
   return (
     <div ref={cardRef} onClick={() => navigate(`/doctor/${makeDocSlug(doc)}`, { state: { doc } })}
@@ -204,7 +266,11 @@ function DoctorCard({ doc, isMobile, highlighted, onHover, cardRef }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, color: highlighted ? C.ocean : C.deep, fontSize: isMobile ? 14 : 15, lineHeight: 1.3, transition: "color 0.15s" }}>{doc.name}</div>
           <div style={{ color: C.ocean, fontSize: 12, fontWeight: 500, marginTop: 2 }}>{doc.specialty}</div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>📍 {doc.city}, CA{doc.phone && doc.phone !== "Call for number" && <> &nbsp;·&nbsp; 📞 {doc.phone}</>}</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>
+            📍 {doc.city}, CA
+            {userCoords && doc.zip && (() => { const d = formatDistance(getDistanceMiles(userCoords.lat, userCoords.lng, doc.zip)); return d ? <span style={{ marginLeft: 6, background: "rgba(26,107,138,0.08)", color: C.ocean, borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 600 }}>📍 {d}</span> : null; })()}
+            {doc.phone && doc.phone !== "Call for number" && <> &nbsp;·&nbsp; 📞 {doc.phone}</>}
+          </div>
         </div>
         {isMobile && (
           <div style={{ display: "flex", flexDirection: "column", gap: 5, flexShrink: 0 }}>
@@ -681,7 +747,7 @@ export default function Search() {
           )}
 
           {!loading && !error && sortedResults.map((doc, i) => (
-            <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} highlighted={highlightedNpi === doc.npi} onHover={handleHighlight} cardRef={el => cardRefs.current[doc.npi] = el} />
+            <DoctorCard key={doc.npi || i} doc={doc} isMobile={isMobile} highlighted={highlightedNpi === doc.npi} onHover={handleHighlight} cardRef={el => cardRefs.current[doc.npi] = el} userCoords={userCoords} />
           ))}
 
           {!loading && !error && hasMore && (
