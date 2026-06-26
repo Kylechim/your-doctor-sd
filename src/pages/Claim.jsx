@@ -172,18 +172,28 @@ function Step1({ data, setData, onNext }) {
         </div>
       )}
 
-      <button onClick={() => { if (selected) { setData({ ...data, practice: selected }); onNext(); } }}
-        disabled={!selected}
-        style={{
-          width: "100%", marginTop: "1.5rem",
-          background: selected ? C.ocean : C.border,
-          color: selected ? "white" : C.muted,
-          border: "none", padding: "0.8rem", borderRadius: 10,
-          fontFamily: "inherit", fontSize: 15, fontWeight: 600,
-          cursor: selected ? "pointer" : "default", transition: "all 0.2s",
-        }}>
-        Continue →
-      </button>
+      {/* Sticky continue button — always visible at bottom */}
+      <div style={{ position: "sticky", bottom: 0, background: "white", padding: "1rem 0 0.2rem", marginTop: "1rem", borderTop: selected ? `1.5px solid ${C.border}` : "none" }}>
+        {selected && (
+          <div style={{ background: "rgba(26,107,138,0.05)", border: `1px solid rgba(26,107,138,0.15)`, borderRadius: 10, padding: "0.7rem 1rem", marginBottom: "0.7rem", fontSize: 13 }}>
+            <span style={{ fontWeight: 600, color: C.deep }}>Selected: </span>
+            <span style={{ color: C.ocean }}>{selected.name}</span>
+            <span style={{ color: C.muted }}> · {selected.city}, CA</span>
+          </div>
+        )}
+        <button onClick={() => { if (selected) { setData({ ...data, practice: selected }); onNext(); } }}
+          disabled={!selected}
+          style={{
+            width: "100%",
+            background: selected ? C.ocean : C.border,
+            color: selected ? "white" : C.muted,
+            border: "none", padding: "0.8rem", borderRadius: 10,
+            fontFamily: "inherit", fontSize: 15, fontWeight: 600,
+            cursor: selected ? "pointer" : "default", transition: "all 0.2s",
+          }}>
+          {selected ? `Continue with ${selected.name.split(",")[0]} →` : "Select a provider to continue"}
+        </button>
+      </div>
     </div>
   );
 }
