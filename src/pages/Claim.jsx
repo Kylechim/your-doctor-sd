@@ -1,5 +1,5 @@
 import { ALL_INSURANCES, ALL_LANGUAGES, DAYS, COLORS as C } from "../data/doctors";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
@@ -88,6 +88,16 @@ function Step1({ data, setData, onNext }) {
   const [searched, setSearched] = useState(false);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState(null);
+  const continueRef = useRef(null);
+
+  function selectAndScroll(r) {
+    setSelected(r);
+    setTimeout(() => {
+      if (continueRef.current) {
+        continueRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 50);
+  }
 
   async function doSearch() {
     if (search.trim().length < 2) return;
@@ -140,7 +150,7 @@ function Step1({ data, setData, onNext }) {
             {results.length > 0 ? `Found ${results.length} results for "${search}"` : `No results found for "${search}"`}
           </div>
           {results.map((r, i) => (
-            <div key={i} onClick={() => setSelected(r)} style={{
+            <div key={i} onClick={() => selectAndScroll(r)} style={{
               border: `1.5px solid ${selected?.npi === r.npi ? C.ocean : C.border}`,
               borderRadius: 12, padding: "1rem 1.1rem", marginBottom: "0.7rem",
               cursor: "pointer",
@@ -172,8 +182,8 @@ function Step1({ data, setData, onNext }) {
         </div>
       )}
 
-      {/* Sticky continue button — always visible at bottom */}
-      <div style={{ position: "sticky", bottom: 0, background: "white", padding: "1rem 0 0.2rem", marginTop: "1rem", borderTop: selected ? `1.5px solid ${C.border}` : "none" }}>
+      {/* Continue button — scrolled to when selection made */}
+      <div ref={continueRef} style={{ padding: "1rem 0 0.2rem", marginTop: "1rem", borderTop: selected ? `1.5px solid ${C.border}` : "none" }}>
         {selected && (
           <div style={{ background: "rgba(26,107,138,0.05)", border: `1px solid rgba(26,107,138,0.15)`, borderRadius: 10, padding: "0.7rem 1rem", marginBottom: "0.7rem", fontSize: 13 }}>
             <span style={{ fontWeight: 600, color: C.deep }}>Selected: </span>
