@@ -132,78 +132,76 @@ function Step1({ data, setData, onNext }) {
         <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, margin: 0 }}>Search by your name or NPI number to find your listing in our directory.</p>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: "1.2rem" }}>
-        <Input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Your name or NPI number…"
-          onKeyDown={e => e.key === "Enter" && doSearch()}
-          style={{ flex: 1 }}
-        />
-        <button onClick={doSearch} disabled={searching}
-          style={{ background: C.ocean, color: "white", border: "none", padding: "0 1.2rem", borderRadius: 9, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: searching ? "default" : "pointer", whiteSpace: "nowrap", opacity: searching ? 0.7 : 1 }}>
-          {searching ? "..." : "Search"}
-        </button>
-      </div>
-
-      {searched && (
+      {/* If selected, collapse results and show just the selection */}
+      {selected ? (
         <div>
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-            {results.length > 0 ? `Found ${results.length} results for "${search}"` : `No results found for "${search}"`}
-          </div>
-          {results.map((r, i) => (
-            <div key={i} onClick={() => selectAndScroll(r)} style={{
-              border: `1.5px solid ${selected?.npi === r.npi ? C.ocean : C.border}`,
-              borderRadius: 12, padding: "1rem 1.1rem", marginBottom: "0.7rem",
-              cursor: "pointer",
-              background: selected?.npi === r.npi ? "rgba(26,107,138,0.04)" : "white",
-              transition: "border-color 0.15s, background 0.15s",
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: C.deep, fontSize: 15, marginBottom: 2 }}>{r.name}</div>
-                  <div style={{ fontSize: 13, color: C.ocean, marginBottom: 3 }}>{r.specialty}</div>
-                  <div style={{ fontSize: 12, color: C.muted }}>📍 {r.address}, {r.city}, CA</div>
-                  <div style={{ fontSize: 11, color: "#aac4ce", marginTop: 2 }}>NPI {r.npi}</div>
-                </div>
-                <div>
-                  {selected?.npi === r.npi
-                    ? <span style={{ fontSize: 18 }}>✅</span>
-                    : <span style={{ fontSize: 12, color: C.ocean, fontWeight: 500 }}>Select →</span>
-                  }
-                </div>
+          <div style={{ border: `1.5px solid ${C.ocean}`, borderRadius: 12, padding: "1rem 1.1rem", background: "rgba(26,107,138,0.04)", marginBottom: "1rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+              <div>
+                <div style={{ fontWeight: 600, color: C.deep, fontSize: 15, marginBottom: 2 }}>{selected.name}</div>
+                <div style={{ fontSize: 13, color: C.ocean, marginBottom: 3 }}>{selected.specialty}</div>
+                <div style={{ fontSize: 12, color: C.muted }}>📍 {selected.address}, {selected.city}, CA</div>
+                <div style={{ fontSize: 11, color: "#aac4ce", marginTop: 2 }}>NPI {selected.npi}</div>
               </div>
+              <span style={{ fontSize: 18 }}>✅</span>
             </div>
-          ))}
+          </div>
+          <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: C.ocean, fontSize: 13, cursor: "pointer", padding: 0, textDecoration: "underline", marginBottom: "1.2rem", display: "block" }}>
+            ← Search again / change selection
+          </button>
+          <button onClick={() => { setData({ ...data, practice: selected }); onNext(); }}
+            style={{ width: "100%", background: C.ocean, color: "white", border: "none", padding: "0.8rem", borderRadius: 10, fontFamily: "inherit", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+            Continue with {selected.name.split(",")[0]} →
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div style={{ display: "flex", gap: 8, marginBottom: "1.2rem" }}>
+            <Input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Your name or NPI number…"
+              onKeyDown={e => e.key === "Enter" && doSearch()}
+              style={{ flex: 1 }}
+            />
+            <button onClick={doSearch} disabled={searching}
+              style={{ background: C.ocean, color: "white", border: "none", padding: "0 1.2rem", borderRadius: 9, fontFamily: "inherit", fontSize: 14, fontWeight: 600, cursor: searching ? "default" : "pointer", whiteSpace: "nowrap", opacity: searching ? 0.7 : 1 }}>
+              {searching ? "..." : "Search"}
+            </button>
+          </div>
 
-          {results.length === 0 && (
-            <div style={{ marginTop: "1rem", padding: "0.9rem", background: "rgba(26,107,138,0.04)", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, color: C.muted }}>
-              🤔 Don't see your practice? Try searching by your NPI number, or contact us at <span style={{ color: C.ocean }}>hello@yourdoctorsd.com</span>
+          {searched && (
+            <div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
+                {results.length > 0 ? `Found ${results.length} results for "${search}"` : `No results found for "${search}"`}
+              </div>
+              {results.map((r, i) => (
+                <div key={i} onClick={() => setSelected(r)} style={{
+                  border: `1.5px solid ${C.border}`, borderRadius: 12, padding: "1rem 1.1rem", marginBottom: "0.7rem",
+                  cursor: "pointer", background: "white", transition: "border-color 0.15s",
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = C.sky}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, color: C.deep, fontSize: 15, marginBottom: 2 }}>{r.name}</div>
+                      <div style={{ fontSize: 13, color: C.ocean, marginBottom: 3 }}>{r.specialty}</div>
+                      <div style={{ fontSize: 12, color: C.muted }}>📍 {r.address}, {r.city}, CA</div>
+                      <div style={{ fontSize: 11, color: "#aac4ce", marginTop: 2 }}>NPI {r.npi}</div>
+                    </div>
+                    <span style={{ fontSize: 12, color: C.ocean, fontWeight: 500, flexShrink: 0 }}>Select →</span>
+                  </div>
+                </div>
+              ))}
+
+              {results.length === 0 && (
+                <div style={{ marginTop: "1rem", padding: "0.9rem", background: "rgba(26,107,138,0.04)", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, color: C.muted }}>
+                  🤔 Don't see your practice? Try searching by your NPI number, or contact us at <span style={{ color: C.ocean }}>hello@yourdoctorsd.com</span>
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
-
-      {/* Continue button — scrolled to when selection made */}
-      <div ref={continueRef} style={{ padding: "1rem 0 0.2rem", marginTop: "1rem", borderTop: selected ? `1.5px solid ${C.border}` : "none" }}>
-        {selected && (
-          <div style={{ background: "rgba(26,107,138,0.05)", border: `1px solid rgba(26,107,138,0.15)`, borderRadius: 10, padding: "0.7rem 1rem", marginBottom: "0.7rem", fontSize: 13 }}>
-            <span style={{ fontWeight: 600, color: C.deep }}>Selected: </span>
-            <span style={{ color: C.ocean }}>{selected.name}</span>
-            <span style={{ color: C.muted }}> · {selected.city}, CA</span>
-          </div>
-        )}
-        <button onClick={() => { if (selected) { setData({ ...data, practice: selected }); onNext(); } }}
-          disabled={!selected}
-          style={{
-            width: "100%",
-            background: selected ? C.ocean : C.border,
-            color: selected ? "white" : C.muted,
-            border: "none", padding: "0.8rem", borderRadius: 10,
-            fontFamily: "inherit", fontSize: 15, fontWeight: 600,
-            cursor: selected ? "pointer" : "default", transition: "all 0.2s",
-          }}>
-          {selected ? `Continue with ${selected.name.split(",")[0]} →` : "Select a provider to continue"}
-        </button>
-      </div>
     </div>
   );
 }
