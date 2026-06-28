@@ -447,6 +447,24 @@ function Step4({ data, onBack, onSubmit }) {
         throw new Error(err || "Submission failed");
       }
 
+      // Send email notification to admin
+      await fetch('/api/notify-claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctorName: doc.name,
+          specialty: doc.specialty,
+          address: doc.address,
+          city: doc.city,
+          npi: doc.npi,
+          email: data.email,
+          accepting: data.accepting,
+          telehealth: data.telehealth,
+          insurance: data.insurance,
+          languages: data.languages,
+        }),
+      });
+
       onSubmit();
     } catch (e) {
       console.error(e);
